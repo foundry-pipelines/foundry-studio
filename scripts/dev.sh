@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-[ -f vendor/scripts/manifest/manifest.py ] || git submodule update --init
+[ -f vendor/scripts/lib/pipeline.py ] || git submodule update --init
 [ -d frontend/node_modules ] || (cd frontend && npm ci)
 (cd backend && uv sync -q)
 

@@ -59,6 +59,7 @@ class Settings:
         s = cls()
         env = os.environ
         s.gitlab_url = env.get("GITLAB_URL", s.gitlab_url).rstrip("/")
+        s.pipelines_repo = f"{s.gitlab_url}/foundry-platform/pipelines.git"
         if env.get("STUDIO_PROCESSOR_PROJECTS", "*").strip() not in ("", "*"):
             s.processor_projects = _list(env["STUDIO_PROCESSOR_PROJECTS"])
         s.poll_interval = float(env.get("STUDIO_POLL_INTERVAL", s.poll_interval))
@@ -67,8 +68,9 @@ class Settings:
             s.scripts_dir = Path(env["FOUNDRY_SCRIPTS_DIR"]).resolve()
         if env.get("STUDIO_WORKSPACE"):
             s.workspace = Path(env["STUDIO_WORKSPACE"]).expanduser().resolve()
-        s.configs_repo = env.get("STUDIO_CONFIGS_REPO", s.configs_repo)
-        s.schema_registry_repo = env.get("STUDIO_SCHEMA_REGISTRY_REPO", s.schema_registry_repo)
+        s.configs_repo = env.get("STUDIO_CONFIGS_REPO", f"{s.gitlab_url}/foundry-platform/common/configRegistry.git")
+        s.schema_registry_repo = env.get("STUDIO_SCHEMA_REGISTRY_REPO",
+                                         f"{s.gitlab_url}/foundry-platform/common/schemaRegistry.git")
         s.fake_gitlab = env.get("STUDIO_FAKE_GITLAB") or None
         if "STUDIO_PIPELINES_REPO" in env or s.fake_gitlab:
             s.pipelines_repo = env.get("STUDIO_PIPELINES_REPO") or None
