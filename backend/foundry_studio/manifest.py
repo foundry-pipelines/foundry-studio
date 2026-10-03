@@ -28,8 +28,6 @@ CONNECTION_KEYS = ("Brokers", "SecurityProtocol", "SaslMechanism", "SecretRef")
 TOP_LEVEL = ("Name", "ConfigRegistry", "Kafkas", "Processors", "Flow")
 DEFAULT_REF = "main"
 
-HEADER = ("# yaml-language-server: $schema=https://gitlab.com/foundry-platform/common/scripts/-/jobs/artifacts/main/raw/"
-          "manifest.schema.json?job=schema")
 FLOW_INDENT = "    "
 
 
@@ -299,7 +297,7 @@ def graph_to_manifest(graph: dict) -> str:
     wired = wiring(graph)
     order = canonical_order(wired)
     trailing = {tuple(k.split("/")): v for k, v in (graph.get("comments") or {}).items()}
-    sections: list[list[str]] = [[HEADER, _value_lines("Name", graph.get("name") or "", 0, (), trailing)[0]]]
+    sections: list[list[str]] = [[_value_lines("Name", graph.get("name") or "", 0, (), trailing)[0]]]
 
     registry = _ordered(graph.get("configs") or {}, ("Repo", "Ref"))
     if registry:

@@ -53,7 +53,6 @@ PROCESSORS = {  # project -> (name, in, out, description)
     "IspEnricher": ("Isp", "Packets", "EnrichedPackets", "Adds the ISP of host_ip, from CIDR ranges in appsettings."),
 }
 MANIFEST = f"""\
-# yaml-language-server: $schema=https://gitlab.com/foundry-platform/common/scripts/-/jobs/artifacts/main/raw/manifest.schema.json?job=schema
 Name: EnrichmentPipeline
 
 ConfigRegistry:
