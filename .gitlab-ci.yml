@@ -1,0 +1,50 @@
+# Tests every push and MR (on archpc); on main, also builds the image (arm64, like the k3s node) on GitLab's
+# arm64 runner, pushes it to this project's registry and deploys deploy/foundry-studio with Helm through the
+# Rancher proxy (KUBE_TOKEN: protected, masked).
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+  IMAGE: $CI_REGISTRY_IMAGE
+
+stages: [test, build, deploy]
+
+backend:
+  stage: test
+  tags: [archpc]
+  image: python:3.12
+  script:
+    - pip install --quiet uv
+    - cd backend && uv sync && uv run pytest -q
+
+frontend:
+  stage: test
+  tags: [archpc]
+  image: node:20
+  script:
+    - cd frontend && npm ci && npx tsc -b && npx vitest run
+
+image:
+  stage: build
+  tags: [saas-linux-small-arm64]
+  image: docker:27
+  services: [docker:27-dind]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker build -t "$IMAGE:$CI_COMMIT_SHA" -t "$IMAGE:latest" .
+    - docker push "$IMAGE:$CI_COMMIT_SHA"
+    - docker push "$IMAGE:latest"
+
+deploy:
+  stage: deploy
+  tags: [archpc]
+  image: {name: alpine/helm:3.16.4, entrypoint: [""]}
+  resource_group: production
+  environment: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - >
+      helm upgrade foundry-studio deploy/foundry-studio -n apps
+      --kube-apiserver https://haltura.me/k8s/clusters/local --kube-token "$KUBE_TOKEN"
+      --set image.repository=$IMAGE --set image.tag=$CI_COMMIT_SHA --wait --timeout 180s

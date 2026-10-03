@@ -1,7 +1,7 @@
 image:
-  repository: ghcr.io/yume02kki/foundrystudio
+  repository: registry.gitlab.com/foundry-platform/foundrystudio
   tag: latest                   # CI sets the commit SHA
-  pullPolicy: IfNotPresent      # CI pulls the image onto the node before upgrading
+  pullPolicy: IfNotPresent      # tags are commit SHAs
 envSecret: foundry-studio-env   # GITLAB_TOKEN etc.
 nodePort: 30082
 storage: 5Gi

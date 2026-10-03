@@ -127,7 +127,7 @@ A processor's versions are its `v*` tags (`<Path>/v*` in a folder), newest semve
 
 ## CI and deployment
 
-`.github/workflows/ci.yml` runs the tests on every push and PR. On `main` it also builds the arm64 image (`Dockerfile`), pushes it to `ghcr.io/yume02kki/foundrystudio`, and deploys the `deploy/foundry-studio` Helm chart to the k3s node over SSH (secrets `DEPLOY_HOST`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`). Settings such as `GITLAB_TOKEN` live in the cluster secret `foundry-studio-env`.
+`.gitlab-ci.yml` runs the tests on every push and MR. On `main` it also builds the arm64 image (`Dockerfile`) on GitLab's arm64 runner, pushes it to `registry.gitlab.com/foundry-platform/foundrystudio`, and deploys the `deploy/foundry-studio` Helm chart through the Rancher proxy (protected variable `KUBE_TOKEN`). Settings such as `GITLAB_TOKEN` live in the cluster secret `foundry-studio-env`.
 
 ## Tests
 
