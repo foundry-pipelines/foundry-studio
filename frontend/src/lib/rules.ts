@@ -1,12 +1,12 @@
 // Connection rules for live feedback while dragging a wire. They mirror scripts' validators
-// (validators/pipelines/typecheck.py), worded the same way, but those stay authoritative: a refused
+// (pipeline/validate/typecheck.py), worded the same way, but those stay authoritative: a refused
 // drop asks the backend for their message, and the top bar shows their validation of the whole
 // manifest.
 //
 // A wire is a Flow entry and always joins a processor and a Kafka: Kafka -> processor (it reads it),
 // processor -> Kafka (it writes it). A processor writes one Kafka and, unless its Runtime is flink,
 // reads one. Its types (in, out) and Runtime are those its operator.yaml declares at its Ref.
-// "Schema" in the names below means a type: a type name from schemaRegistry.
+// "Schema" in the names below means a type: a type name from schema-registry.
 
 import type { GraphEdge, GraphNode, ProcessorInfo } from "../types";
 import { findInfo, versionFor } from "./versions";

@@ -23,19 +23,19 @@ class Settings:
     poll_interval: float = 10.0
     # Full rescan even without events, to catch anything the events API missed.
     full_rescan_interval: float = 300.0
-    # Checkout of foundry-platform/common/scripts at the pinned commit (git submodule): its validators.
-    scripts_dir: Path = REPO_ROOT / "vendor" / "scripts"
+    # Checkout of foundry-platform/foundry-ci at the pinned commit (git submodule): its validators.
+    scripts_dir: Path = REPO_ROOT / "vendor" / "foundry-ci"
     # The pipelines Studio edits: <workspace>/<folder>/PipelineManifest.yaml, one folder (a
     # pipeline repo checkout, ideally) per pipeline. None: <repo>/workspace (or the demo's).
     workspace: Path | None = None
     # The pipelines repo, one folder per pipeline; the workspace is kept a checkout of it. None: the
     # workspace is a plain folder (the default with a fake GitLab).
-    pipelines_repo: str | None = "https://gitlab.com/foundry-platform/pipelines.git"
+    pipelines_repo: str | None = "https://gitlab.com/foundry-platform/pipeline-manifests.git"
     # Connection profiles (kafka/<name>.json) for manifests without ConfigRegistry.Repo, and new ones.
-    configs_repo: str = "foundry-platform/common/configRegistry"
-    # schemaRegistry: its types (folders with a metadata.yaml) are the names AllowedTypes and
+    configs_repo: str = "foundry-platform/registries/config-registry"
+    # schema-registry: its types (folders with a metadata.yaml) are the names AllowedTypes and
     # operator.yaml in/out may use.
-    schema_registry_repo: str = "foundry-platform/common/schemaRegistry"
+    schema_registry_repo: str = "foundry-platform/registries/schema-registry"
     # "demo" or a directory: serve GitLab from local git repos instead of gitlab.com.
     fake_gitlab: str | None = None
     # Kafka credentials for the live feed, laid out like the processor runtime's:
@@ -59,7 +59,7 @@ class Settings:
         s = cls()
         env = os.environ
         s.gitlab_url = env.get("GITLAB_URL", s.gitlab_url).rstrip("/")
-        s.pipelines_repo = f"{s.gitlab_url}/foundry-platform/pipelines.git"
+        s.pipelines_repo = f"{s.gitlab_url}/foundry-platform/pipeline-manifests.git"
         if env.get("STUDIO_PROCESSOR_PROJECTS", "*").strip() not in ("", "*"):
             s.processor_projects = _list(env["STUDIO_PROCESSOR_PROJECTS"])
         s.poll_interval = float(env.get("STUDIO_POLL_INTERVAL", s.poll_interval))

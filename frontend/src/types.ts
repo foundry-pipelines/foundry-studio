@@ -23,7 +23,7 @@ export interface Processorspec {
 /** A Kafkas: entry. Config names a connection profile; ConnectionSettings override it key by key. */
 export interface DatasetSpec {
   Config?: string;
-  AllowedTypes?: string[]; // type names in schemaRegistry
+  AllowedTypes?: string[]; // type names in schema-registry
   Topic?: string;
   ConnectionSettings?: ConnectionSettings;
   [key: string]: unknown;
@@ -56,7 +56,7 @@ export interface Graph {
   warnings?: string[];
 }
 
-/** What manifests refer to (read-only): connection profiles from configRegistry, type names from schemaRegistry. */
+/** What manifests refer to (read-only): connection profiles from config-registry, type names from schema-registry. */
 export interface Catalog {
   profiles: Record<string, ConnectionSettings>; // "kafka/prod" -> its ConnectionSettings
   types: string[];

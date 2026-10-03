@@ -1,6 +1,6 @@
 .PHONY: setup dev demo demo-reset test test-backend test-frontend e2e build serve
 
-setup:            ## install everything (scripts submodule, Python and Node deps)
+setup:            ## install everything (foundry-ci submodule, Python and Node deps)
 	git submodule update --init
 	cd backend && uv sync
 	cd frontend && npm ci

@@ -1,7 +1,7 @@
-"""Access to the pinned foundry-platform/common/scripts checkout: its validators as a library.
+"""Access to the pinned foundry-platform/foundry-ci checkout: its validators as a library.
 
-scripts decides what a valid PipelineManifest.yaml is: lib/pipeline.py (manifest format, profiles,
-schemaRegistry types), validators/pipelines/typecheck.py and cycles.py, the same checks the pipelines CI
+foundry-ci decides what a valid PipelineManifest.yaml is: shared/pipeline.py (manifest format, profiles,
+schema-registry types), pipeline/validate/typecheck.py and cycles.py, the same checks the pipelines CI
 runs. Nothing here re-implements a rule; we only import them and attach each error to the node or
 edge it talks about.
 """
@@ -71,27 +71,27 @@ def _load(name: str, path: Path) -> ModuleType:
 class Foundry:
     def __init__(self, root: Path):
         self.root = root
-        if not (root / "lib" / "pipeline.py").is_file():
+        if not (root / "shared" / "pipeline.py").is_file():
             raise RuntimeError(
-                f"{root}/lib/pipeline.py not found; run `git submodule update --init` "
-                "(foundry-platform/common/scripts is pinned in vendor/scripts)"
+                f"{root}/shared/pipeline.py not found; run `git submodule update --init` "
+                "(foundry-platform/foundry-ci is pinned in vendor/foundry-ci)"
             )
 
     @cached_property
     def pipeline(self) -> ModuleType:
-        """lib/pipeline.py: the manifest format, profiles, schemaRegistry types. Loaded as `pipeline`, the name
+        """shared/pipeline.py: the manifest format, profiles, schema-registry types. Loaded as `pipeline`, the name
         the validators import it by."""
-        return _load("pipeline", self.root / "lib" / "pipeline.py")
+        return _load("pipeline", self.root / "shared" / "pipeline.py")
 
     @cached_property
     def typecheck(self) -> ModuleType:
         self.pipeline  # noqa: B018 (typecheck imports it)
-        return _load("foundry_typecheck", self.root / "validators" / "pipelines" / "typecheck.py")
+        return _load("foundry_typecheck", self.root / "pipeline" / "validate" / "typecheck.py")
 
     @cached_property
     def cycles(self) -> ModuleType:
         self.pipeline  # noqa: B018
-        return _load("foundry_cycles", self.root / "validators" / "pipelines" / "cycles.py")
+        return _load("foundry_cycles", self.root / "pipeline" / "validate" / "cycles.py")
 
     @cached_property
     def commit(self) -> str | None:

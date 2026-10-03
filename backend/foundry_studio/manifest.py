@@ -1,6 +1,6 @@
 """UI graph <-> PipelineManifest.yaml.
 
-The manifest format is the contract with foundry-platform/common/scripts (lib/pipeline.py), so the
+The manifest format is the contract with foundry-platform/foundry-ci (shared/pipeline.py), so the
 UI never invents fields. On the canvas, processors and Kafkas are both nodes, and every edge is a
 `Flow:` entry: Kafka -> processor (the processor reads it) or processor -> Kafka (it writes it).
 Every entry under Kafkas is a node, wired or not. Node positions live in a separate

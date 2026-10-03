@@ -11,10 +11,10 @@ from foundry_studio.config import REPO_ROOT, Settings
 from foundry_studio.fake_gitlab import FakeGitLab
 from foundry_studio.foundry import Foundry
 
-SCRIPTS_DIR = REPO_ROOT / "vendor" / "scripts"
-XMLTOJSON = f"{demo.OPERATORS}/xmltojsonprocessor"
-DECODE = f"{demo.OPERATORS}/decodingprocessor"
-ISP = f"{demo.OPERATORS}/IspEnricher"
+SCRIPTS_DIR = REPO_ROOT / "vendor" / "foundry-ci"
+XMLTOJSON = f"{demo.OPERATORS}/xml-parser"
+DECODE = f"{demo.OPERATORS}/decoder"
+ISP = f"{demo.OPERATORS}/isp-enricher"
 PROCESSOR_PROJECTS = [XMLTOJSON, DECODE, ISP]
 
 

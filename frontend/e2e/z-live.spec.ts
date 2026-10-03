@@ -15,7 +15,7 @@ test("a new tag and a new processor show up live; the picked version is saved as
   // (Without a Ref a node follows its default branch, so it's always on the latest.)
   await page.getByTestId("node-Decode").click();
   await page.getByTestId("inspector-ref").selectOption("v1.0.0");
-  demo("tag", "decodingprocessor", "v1.1.0");
+  demo("tag", "decoder", "v1.1.0");
   await expect(page.getByTestId("update-Decode")).toBeVisible({ timeout: 15_000 });
   await page.getByTestId("update-Decode").click();
   await page.getByTestId("version-picker").getByRole("button", { name: /v1\.1\.0/ }).click();
@@ -31,7 +31,7 @@ test("a new tag and a new processor show up live; the picked version is saved as
   await page.getByTestId("save").click();
   await expect(page.getByTestId("saved")).toBeVisible();
   const saved = await (await page.request.get("/api/pipelines/PacketPipeline")).json();
-  expect(saved.manifest).toContain("    Repo: foundry-platform/operators/decodingprocessor\n    Ref: v1.1.0\n");
+  expect(saved.manifest).toContain("    Repo: foundry-platform/example-operators/decoder\n    Ref: v1.1.0\n");
 
   expect(await page.evaluate(() => (window as unknown as { __noReload?: boolean }).__noReload)).toBe(true);
 });

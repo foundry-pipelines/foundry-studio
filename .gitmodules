@@ -1,3 +1,3 @@
-[submodule "vendor/scripts"]
-	path = vendor/scripts
-	url = ../common/scripts.git
+[submodule "vendor/foundry-ci"]
+	path = vendor/foundry-ci
+	url = ../foundry-ci.git

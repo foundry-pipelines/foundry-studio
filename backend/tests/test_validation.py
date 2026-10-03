@@ -56,7 +56,7 @@ def test_errors_are_located(client):
     kafka(g, "ConvertedPackets")["datasetSpec"]["Config"] = "kafka/missing"
     del kafka(g, "Input")["datasetSpec"]["Topic"]
     errors = {e["message"]: e for e in validate(client, g)}
-    assert errors["Kafkas.Output.AllowedTypes: 'Nope' is not in schemaRegistry"]["node"] == "dataset:Output"
+    assert errors["Kafkas.Output.AllowedTypes: 'Nope' is not in schema-registry"]["node"] == "dataset:Output"
     assert errors["Kafkas.ConvertedPackets.Config: Config 'kafka/missing' not found (known: kafka/load, kafka/prod)"][
         "node"] == "dataset:ConvertedPackets"
     assert errors["Kafkas.Input: missing Topic"]["node"] == "dataset:Input"
@@ -70,9 +70,9 @@ def test_type_mismatch_lands_on_the_edge(client):
 
 def test_pinned_ref_uses_that_versions_processor_yaml(client, demo_root):
     # A new release of Decode that reads XmlPackets: pinning it makes the existing wire wrong.
-    repo = demo_root / demo.OPERATORS / "decodingprocessor"
+    repo = demo_root / demo.OPERATORS / "decoder"
     (repo / "operator.yaml").write_text("name: Decode\ndescription: d\nRuntime: dotnet\nin: [XmlPackets]\nout: [EnrichedPackets]\n")
-    demo.tag(demo_root, "decodingprocessor", "v2.0.0")
+    demo.tag(demo_root, "decoder", "v2.0.0")
     client.app.state.services.watcher.full_rescan_interval = 0
     client.portal.call(client.app.state.services.watcher.poll_once)
     g = graph()
@@ -114,7 +114,7 @@ def test_ci_validators_agree(client, demo_root, tmp_path):
     manifest.write_text(graph_to_manifest(g))
     env = {**__import__("os").environ}
     cli = subprocess.run(
-        [sys.executable, str(SCRIPTS_DIR / "validators" / "pipelines" / "typecheck.py"), str(manifest),
+        [sys.executable, str(SCRIPTS_DIR / "pipeline" / "validate" / "typecheck.py"), str(manifest),
          "--schema-registry", str(demo_root / demo.SCHEMA_REGISTRY),
          "--config-registry", str(demo_root / demo.CONFIGS)],
         capture_output=True, text=True, env=env)

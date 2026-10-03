@@ -7,7 +7,7 @@ import { findInfo, headVersion, versionFor } from "../lib/versions";
 import { issuesFor, NAME_RE, TOPIC_RE, useStudio } from "../store";
 import { datasetName, datasetNode, isDatasetNode, type ConnectionSettings, type DatasetSpec, type GraphNode, type Issue } from "../types";
 
-// ConnectionSettings keys (scripts' lib/pipeline.py CONNECTION_KEYS). There is deliberately no password
+// ConnectionSettings keys (scripts' shared/pipeline.py CONNECTION_KEYS). There is deliberately no password
 // field: credentials are referenced by name through SecretRef.
 const PROTOCOLS = ["PLAINTEXT", "SSL", "SASL_PLAINTEXT", "SASL_SSL"];
 const MECHANISMS = ["PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512", "OAUTHBEARER", "GSSAPI"];
@@ -148,18 +148,18 @@ export function ConnectionEditor({
   );
 }
 
-/** A connection profile's settings, from configRegistry (read-only). */
+/** A connection profile's settings, from config-registry (read-only). */
 function ProfileSettings({ profile }: { profile: string | undefined }) {
   const catalog = useStudio((s) => s.catalog);
   if (!profile) return null;
   const settings = catalog?.profiles[profile];
-  if (!settings) return <div className="issue">Profile {profile} isn't in configRegistry.</div>;
+  if (!settings) return <div className="issue">Profile {profile} isn't in config-registry.</div>;
   return (
     <>
       <h4>
         Profile <span className="mono">{profile}</span>
       </h4>
-      <p className="note">From {catalog?.configs?.repo ?? "configRegistry"} (read-only).</p>
+      <p className="note">From {catalog?.configs?.repo ?? "config-registry"} (read-only).</p>
       <table className="kv" data-testid="profile-settings">
         <tbody>
           {Object.entries(settings).map(([k, v]) => (
@@ -348,10 +348,10 @@ function DatasetInspector({ node }: { node: GraphNode }) {
           spellCheck={false}
         />
       </Field>
-      <Field label="Profile" hint="Config: a connection profile from configRegistry">
+      <Field label="Profile" hint="Config: a connection profile from config-registry">
         <Select value={spec?.Config} options={profiles} onChange={(v) => set({ Config: v })} testId="dataset-profile" />
       </Field>
-      <Field label="Allowed types" hint="AllowedTypes: types in schemaRegistry (ctrl-click for several)">
+      <Field label="Allowed types" hint="AllowedTypes: types in schema-registry (ctrl-click for several)">
         <TypesSelect value={spec?.AllowedTypes ?? []} options={types} onChange={(v) => set({ AllowedTypes: v })} />
       </Field>
       <Field label="Written by">
@@ -464,7 +464,7 @@ function PipelineInspector() {
         </button>
       </p>
       <p className="note">
-        Types from {health?.schemaRegistryRepo ?? "schemaRegistry"}: {(catalog?.types ?? []).join(", ") || "none"}.
+        Types from {health?.schemaRegistryRepo ?? "schema-registry"}: {(catalog?.types ?? []).join(", ") || "none"}.
       </p>
       <p className="note">Select a node or an edge to inspect it.</p>
     </>

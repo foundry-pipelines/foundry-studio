@@ -1,12 +1,12 @@
 # Foundry Studio
 
-A visual editor for Foundry pipelines' `PipelineManifest.yaml`, in the spirit of Palantir Foundry's Pipeline Builder. Studio only edits and displays manifests; whether one is valid is decided by `manifest.py` from [foundry-platform/common/scripts](https://gitlab.com/foundry-platform/common/scripts), the same check its `validate` CLI runs.
+A visual editor for Foundry pipelines' `PipelineManifest.yaml`, in the spirit of Palantir Foundry's Pipeline Builder. Studio only edits and displays manifests; whether one is valid is decided by `manifest.py` from [foundry-platform/foundry-ci](https://gitlab.com/foundry-platform/foundry-ci), the same check its `validate` CLI runs.
 
 On the canvas, **datasets** (the manifest's `DataSets`: Kafka topics) and **processors** are both nodes: `dataset → processor → dataset`. A processor reads one dataset (`In`) and writes one (`Out`); a dataset can feed several processors, and several processors can write one dataset. GitLab is watched live: any project with an `operator.yaml` shows up as a building block, without a reload.
 
 - **Backend:** Python + FastAPI (`backend/`). It imports `manifest.py` as a library, so the UI and the CLI can't disagree about what a valid pipeline is.
 - **Frontend:** React + TypeScript + Vite, with React Flow (`@xyflow/react`) for the canvas (`frontend/`).
-- **foundry-platform/common/scripts** is pinned as a git submodule at `vendor/scripts`.
+- **foundry-platform/foundry-ci** is pinned as a git submodule at `vendor/foundry-ci`.
 
 ## The model
 
@@ -14,7 +14,7 @@ On the canvas, **datasets** (the manifest's `DataSets`: Kafka topics) and **proc
 # <workspace>/PacketPipeline/PipelineManifest.yaml
 Name: EnrichmentPipeline
 Configs:
-  Repo: https://gitlab.com/foundry-platform/common/configs.git   # connection profiles (kafka/prod, ...)
+  Repo: https://gitlab.com/foundry-platform/registries/config-registry.git   # connection profiles (kafka/prod, ...)
 DataSets:
   Input:
     Type: Kafka
@@ -23,7 +23,7 @@ DataSets:
     Topic: raw.xml
 Processors:
   XmlToJson:
-    Repo: https://gitlab.com/foundry-platform/enrichers/xmltojsonprocessor.git
+    Repo: https://gitlab.com/foundry-platform/example-operators/xml-parser.git
     In: Input
     Out: ConvertedPackets
 ```
@@ -58,18 +58,18 @@ Open <http://127.0.0.1:5173>. Without a token, set `STUDIO_PROCESSOR_PROJECTS` t
 make demo
 ```
 
-The demo serves local git repos standing in for `foundry-platform/common/configs` and the three `foundry-platform/enrichers` processors, and a workspace with PacketPipeline. Live data shows generated records, labelled **demo data**. To see live updates, "push" from another terminal:
+The demo serves local git repos standing in for `foundry-platform/registries/config-registry` and the three `foundry-platform/enrichers` processors, and a workspace with PacketPipeline. Live data shows generated records, labelled **demo data**. To see live updates, "push" from another terminal:
 
 ```sh
 cd backend
-uv run python -m foundry_studio.demo tag decodingprocessor v1.1.0    # update badge appears
+uv run python -m foundry_studio.demo tag decoder v1.1.0    # update badge appears
 uv run python -m foundry_studio.demo add Deduplicate Packets Packets   # a new card appears
 make demo-reset                                                       # start over
 ```
 
 ## The workspace
 
-`STUDIO_WORKSPACE` holds one folder per pipeline. Studio keeps it a checkout of the pipelines repo, [foundry-platform/foundry-pipelines](https://gitlab.com/foundry-platform/foundry-pipelines) (`STUDIO_PIPELINES_REPO`): it clones it into an empty workspace and fast-forwards it on every push, unless the workspace has changes not committed yet.
+`STUDIO_WORKSPACE` holds one folder per pipeline. Studio keeps it a checkout of the pipelines repo, [foundry-platform/pipeline-manifests](https://gitlab.com/foundry-platform/pipeline-manifests) (`STUDIO_PIPELINES_REPO`): it clones it into an empty workspace and fast-forwards it on every push, unless the workspace has changes not committed yet.
 
 ```
 <workspace>/<folder>/PipelineManifest.yaml          the pipeline
@@ -115,19 +115,19 @@ A processor's versions are its `v*` tags (`<Path>/v*` in a folder), newest semve
 | `GITLAB_URL` | `https://gitlab.com` | Self-hosted GitLab works too |
 | `STUDIO_PROCESSOR_PROJECTS` | every project you're a member of | Or a comma-separated list of projects |
 | `STUDIO_WORKSPACE` | `./workspace` | The pipeline folders Studio edits |
-| `STUDIO_PIPELINES_REPO` | `https://gitlab.com/foundry-platform/foundry-pipelines.git` | The workspace is a checkout of it; empty: a plain folder (the default with `STUDIO_FAKE_GITLAB`) |
-| `STUDIO_CONFIGS_REPO` | `https://gitlab.com/foundry-platform/common/configs.git` | Profiles for manifests without `Configs.Repo`, and new pipelines; schemas |
+| `STUDIO_PIPELINES_REPO` | `https://gitlab.com/foundry-platform/pipeline-manifests.git` | The workspace is a checkout of it; empty: a plain folder (the default with `STUDIO_FAKE_GITLAB`) |
+| `STUDIO_CONFIGS_REPO` | `https://gitlab.com/foundry-platform/registries/config-registry.git` | Profiles for manifests without `Configs.Repo`, and new pipelines; schemas |
 | `STUDIO_POLL_INTERVAL` | `10` | Seconds between polls |
 | `STUDIO_FULL_RESCAN_INTERVAL` | `300` | Full rescan of every project even without events |
 | `GITLAB_WEBHOOK_SECRET` | – | Enables `/api/webhooks/gitlab` |
 | `STUDIO_FAKE_GITLAB` | – | `demo`, or a directory of local repos (tests, e2e) |
 | `STUDIO_KAFKA_CLUSTERS` | – | YAML `clusters: [{match: <Brokers>, connection: {…}}]`, for when brokers are reached differently from this machine (Live data only) |
 | `FOUNDRY_SECRETS_DIR` | `/var/run/secrets/foundry` | Kafka credentials for Live data |
-| `FOUNDRY_SCRIPTS_DIR` | `./vendor/scripts` | Use another foundry-platform/common/scripts checkout |
+| `FOUNDRY_SCRIPTS_DIR` | `./vendor/foundry-ci` | Use another foundry-platform/foundry-ci checkout |
 
 ## CI and deployment
 
-`.gitlab-ci.yml` runs the tests on every push and MR. On `main` it also builds the arm64 image (`Dockerfile`) on GitLab's arm64 runner, pushes it to `registry.gitlab.com/foundry-platform/foundrystudio`, and deploys the `deploy/foundry-studio` Helm chart through the Rancher proxy (protected variable `KUBE_TOKEN`). Settings such as `GITLAB_TOKEN` live in the cluster secret `foundry-studio-env`.
+`.gitlab-ci.yml` runs the tests on every push and MR. On `main` it also builds the arm64 image (`Dockerfile`) on GitLab's arm64 runner, pushes it to `registry.gitlab.com/foundry-platform/foundry-studio`, and deploys the `deploy/foundry-studio` Helm chart through the Rancher proxy (protected variable `KUBE_TOKEN`). Settings such as `GITLAB_TOKEN` live in the cluster secret `foundry-studio-env`.
 
 ## Tests
 
@@ -156,5 +156,5 @@ frontend/src/
   components/      Canvas, PipelineNode, TopicEdge, AssetBrowser, Datasets, Inspector, TopBar, LiveData, Dialogs
   lib/             rules (wiring), stages/pairing/diff, versions, layout, feed health, schema colours
   store.ts         zustand store
-vendor/scripts     foundry-platform/common/scripts (submodule)
+vendor/foundry-ci     foundry-platform/foundry-ci (submodule)
 ```

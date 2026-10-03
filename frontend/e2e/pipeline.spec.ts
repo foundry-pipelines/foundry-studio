@@ -106,7 +106,7 @@ test("a connection shows its topic, consumer group and profile; Kafka edits are 
   await expect(page.getByTestId("saved")).toBeVisible();
   const saved = await (await page.request.get("/api/pipelines/PacketPipeline")).json();
   expect(saved.manifest).toContain("    Config: kafka/load\n    AllowedTypes: [EnrichedPackets]\n    Topic: packets.enriched.v2\n");
-  expect(saved.manifest).not.toContain("Brokers"); // profiles stay in configRegistry
+  expect(saved.manifest).not.toContain("Brokers"); // profiles stay in config-registry
 
   // Put it back for the other tests.
   await page.getByTestId("dataset-topic").fill("packets.enriched");

@@ -61,7 +61,7 @@ async def test_folders_with_processor_yaml_in_a_monorepo(demo_root, fake):
     found = await discovery(fake).scan_project("team-b/enrichers")
     assert set(found) == {"team-b/enrichers:GeoTag", "team-b/enrichers:Shout"}
     assert found["team-b/enrichers:GeoTag"].latest == "GeoTag/v0.1.0"
-    assert found["team-b/enrichers:Shout"].warnings == ["operator.yaml out: 'Bogus' is not a type in schemaRegistry"]
+    assert found["team-b/enrichers:Shout"].warnings == ["operator.yaml out: 'Bogus' is not a type in schema-registry"]
     assert found["team-b/enrichers:Shout"].runtime == "flink"
 
     before = found["team-b/enrichers:GeoTag"].head

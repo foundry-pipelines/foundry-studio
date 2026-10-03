@@ -1,7 +1,7 @@
 """Processor discovery: find processor folders in GitLab projects and list their versions.
 
 A processor is any folder with an `operator.yaml` (name, description, Runtime, in, out: lists of
-type names, the types in schemaRegistry). A version from before its folder had one
+type names, the types in schema-registry). A version from before its folder had one
 carries a warning.
 """
 
@@ -17,7 +17,7 @@ import yaml
 
 from .gitlab import GitLab
 
-DECL_FILE = "operator.yaml"  # scripts' lib/pipeline.py DECL_FILE
+DECL_FILE = "operator.yaml"  # foundry-ci's shared/pipeline.py DECL_FILE
 RUNTIMES = ("dotnet", "flink")
 _SEMVER_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$")
 
@@ -95,7 +95,7 @@ class Discovery:
         known = self.known_types() if callable(self.known_types) else self.known_types
         for name in names:
             if known and name not in known:  # empty: the types couldn't be read, so don't flag everything
-                warnings.append(f"{where}: {name!r} is not a type in schemaRegistry")
+                warnings.append(f"{where}: {name!r} is not a type in schema-registry")
         return " | ".join(names)
 
     async def declaration(self, project: str, path: str, commit: str) -> Decl:

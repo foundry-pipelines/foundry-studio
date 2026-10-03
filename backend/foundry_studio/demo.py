@@ -1,12 +1,12 @@
 """Offline demo: local stand-ins for the foundry repos on GitLab, and a workspace.
 
     python -m foundry_studio.demo init                          # (re)create the demo
-    python -m foundry_studio.demo tag decodingprocessor v1.1.0 # commit + tag, like a release push
+    python -m foundry_studio.demo tag decoder v1.1.0 # commit + tag, like a release push
     python -m foundry_studio.demo add Deduplicate Packets Packets "Drops repeated guids"
     python -m foundry_studio.demo remove Deduplicate
 
-The repos mirror the real ones: foundry-platform/common/configRegistry (connection profiles),
-foundry-platform/common/schemaRegistry (the type names) and one foundry-platform/operators
+The repos mirror the real ones: foundry-platform/registries/config-registry (connection profiles),
+foundry-platform/registries/schema-registry (the type names) and one foundry-platform/example-operators
 project per processor, each with an operator.yaml at its root. The
 workspace holds PacketPipeline. Nothing here needs a token, Docker or Kafka; Live data shows
 generated records.
@@ -24,9 +24,9 @@ from pathlib import Path
 from .config import REPO_ROOT
 
 DEFAULT_ROOT = REPO_ROOT / ".demo-gitlab"
-CONFIGS = "foundry-platform/common/configRegistry"
-SCHEMA_REGISTRY = "foundry-platform/common/schemaRegistry"
-OPERATORS = "foundry-platform/operators"
+CONFIGS = "foundry-platform/registries/config-registry"
+SCHEMA_REGISTRY = "foundry-platform/registries/schema-registry"
+OPERATORS = "foundry-platform/example-operators"
 
 # Fixed dates keep commit SHAs identical across `init` runs.
 FIXED_DATE = "2026-09-01T12:00:00+00:00"
@@ -38,8 +38,8 @@ PROFILES = {
                         '    "SaslMechanism": "SCRAM-SHA-512", "SecretRef": "kafka-load-creds"}\n}\n'),
 }
 TYPES = {  # type -> owner; EnrichedPackets has no schema, like the real one
-    "XmlPackets": "xmltojsonprocessor", "Packets": "xmltojsonprocessor", "DecodeEnrichment": "decodingprocessor",
-    "IspEnrichment": "IspEnricher", "EnrichedPackets": "packetjoiner",
+    "XmlPackets": "xml-parser", "Packets": "xml-parser", "DecodeEnrichment": "decoder",
+    "IspEnrichment": "isp-enricher", "EnrichedPackets": "packet-joiner",
 }
 REGISTRY_FILES = {
     **{f"{t}/metadata.yaml": f"owner: {o}\n" + ("ignoreSchema: true\n" if t == "EnrichedPackets" else "")
@@ -48,9 +48,9 @@ REGISTRY_FILES = {
        for t in TYPES if t != "EnrichedPackets"},
 }
 PROCESSORS = {  # project -> (name, in, out, description)
-    "xmltojsonprocessor": ("XmlToJson", "XmlPackets", "Packets", "Converts XML packets to JSON; data stays base64."),
-    "decodingprocessor": ("Decode", "Packets", "EnrichedPackets", "Decodes the base64 payload to text."),
-    "IspEnricher": ("Isp", "Packets", "EnrichedPackets", "Adds the ISP of host_ip, from CIDR ranges in appsettings."),
+    "xml-parser": ("XmlToJson", "XmlPackets", "Packets", "Converts XML packets to JSON; data stays base64."),
+    "decoder": ("Decode", "Packets", "EnrichedPackets", "Decodes the base64 payload to text."),
+    "isp-enricher": ("Isp", "Packets", "EnrichedPackets", "Adds the ISP of host_ip, from CIDR ranges in appsettings."),
 }
 MANIFEST = f"""\
 Name: EnrichmentPipeline
@@ -77,15 +77,15 @@ Kafkas:
 
 Processors:
   XmlToJson:
-    Repo: {OPERATORS}/xmltojsonprocessor
+    Repo: {OPERATORS}/xml-parser
     Ref: main
 
   Decode:
-    Repo: {OPERATORS}/decodingprocessor
+    Repo: {OPERATORS}/decoder
     Ref: main
 
   Isp:
-    Repo: {OPERATORS}/IspEnricher
+    Repo: {OPERATORS}/isp-enricher
     Ref: main
 
 Flow:
@@ -125,7 +125,7 @@ def processor_files(name: str, input: str, output: str, version: str = "1.0.0",
         f"{name}.csproj": (
             '<Project Sdk="Microsoft.NET.Sdk.Worker">\n  <PropertyGroup>\n    <TargetFramework>net8.0</TargetFramework>\n'
             f"    <Version>{version}</Version>\n  </PropertyGroup>\n  <ItemGroup>\n"
-            '    <PackageReference Include="Foundry.Common.Configuration" Version="2.*" />\n  </ItemGroup>\n</Project>\n'),
+            '    <PackageReference Include="Foundry.MetaSettings" Version="2.*" />\n  </ItemGroup>\n</Project>\n'),
         "Program.cs": (f"// Demo stand-in: {input} -> {output}.\n"
                        f"static {output} Processor({input} p) => new() {{ Guid = p.Guid }};\n"),
     }

@@ -55,7 +55,7 @@ async def test_new_tag_new_repo_and_removal(demo_root, fake):
     await w.poll_once()
     assert drain(q) == []  # nothing changed, nothing sent
 
-    demo.tag(demo_root, "decodingprocessor", "v1.1.0")
+    demo.tag(demo_root, "decoder", "v1.1.0")
     await w.poll_once()
     [ev] = drain(q)
     assert ev["type"] == "processor.updated" and ev["newVersions"] == ["v1.1.0"]
@@ -100,7 +100,7 @@ async def test_webhook_tag_push_rescans(demo_root, fake):
     w, bus, q = make_watcher(fake, [XMLTOJSON])
     await w.initial_scan()
     drain(q)
-    demo.tag(demo_root, "xmltojsonprocessor", "v1.2.0")
+    demo.tag(demo_root, "xml-parser", "v1.2.0")
     await w.handle_webhook("Tag Push Hook", {"project": {"path_with_namespace": XMLTOJSON}})
     [ev] = drain(q)
     assert ev["newVersions"] == ["v1.2.0"]

@@ -11,8 +11,8 @@ from foundry_studio.sources import SourceError, Sources
 
 
 def sources(fake, foundry, ttl=30.0) -> Sources:
-    return Sources(fake, "https://gitlab.com", foundry.pipeline, "https://gitlab.com/foundry-platform/common/configRegistry.git",
-                   "https://gitlab.com/foundry-platform/common/schemaRegistry.git", ttl=ttl)
+    return Sources(fake, "https://gitlab.com", foundry.pipeline, "https://gitlab.com/foundry-platform/registries/config-registry.git",
+                   "https://gitlab.com/foundry-platform/registries/schema-registry.git", ttl=ttl)
 
 
 @pytest.mark.anyio
@@ -52,6 +52,6 @@ def test_catalog_endpoint(services):
     with TestClient(create_app(services, start_watcher=False)) as c:
         cat = c.get("/api/catalog").json()
         assert list(cat["profiles"]) == ["kafka/load", "kafka/prod"] and cat["errors"] == {}
-        assert cat["configs"]["repo"] == "foundry-platform/common/configRegistry"
+        assert cat["configs"]["repo"] == "foundry-platform/registries/config-registry"
         assert cat["types"] == sorted(demo.TYPES)
         assert "configs" in c.get("/api/catalog?ref=nope").json()["errors"]

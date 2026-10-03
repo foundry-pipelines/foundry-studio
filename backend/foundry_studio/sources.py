@@ -1,8 +1,8 @@
 """What a manifest refers to but doesn't contain, read through the GitLab API:
 
-* connection profiles, `kafka/<name>.json` in the configRegistry repo the manifest names
+* connection profiles, `kafka/<name>.json` in the config-registry repo the manifest names
   (`ConfigRegistry: {Repo, Ref}`), e.g. kafka/prod;
-* type names: the types in schemaRegistry (`<Type>/metadata.yaml`), which manifests' AllowedTypes
+* type names: the types in schema-registry (`<Type>/metadata.yaml`), which manifests' AllowedTypes
   and operator.yaml's in/out name.
 
 Both are cached for a few seconds, so validating on every edit doesn't hit GitLab each time,
@@ -40,7 +40,7 @@ class Sources:
 
     def project_of(self, repo: str) -> str:
         """A Repo's project on this GitLab: a project path as it is, or a URL of this GitLab without its host
-        (https://gitlab.com/foundry-platform/common/configRegistry.git -> foundry-platform/common/configRegistry)."""
+        (https://gitlab.com/foundry-platform/registries/config-registry.git -> foundry-platform/registries/config-registry)."""
         base = self.gitlab_url.split("://", 1)[-1]
         url = repo.strip().split("://", 1)[-1].removesuffix("/").removesuffix(".git")
         if "://" not in repo:
@@ -98,7 +98,7 @@ class Sources:
         return await self._cached(("configs", repo, ref), load)
 
     async def types(self) -> list[str]:
-        """The type names in schemaRegistry (folders with a metadata.yaml), from its default branch."""
+        """The type names in schema-registry (folders with a metadata.yaml), from its default branch."""
         async def load():
             name = self.project_of(self.schema_registry_repo)
             project = await self.gitlab.get_project(name)
@@ -115,7 +115,7 @@ class Sources:
 
     @staticmethod
     def stage(configs: dict, dest: Path) -> Path:
-        """Write a configs() snapshot as a checkout scripts' lib/pipeline.py can read."""
+        """Write a configs() snapshot as a checkout foundry-ci's shared/pipeline.py can read."""
         for path, data in configs["files"].items():
             (dest / path).parent.mkdir(parents=True, exist_ok=True)
             (dest / path).write_bytes(data)

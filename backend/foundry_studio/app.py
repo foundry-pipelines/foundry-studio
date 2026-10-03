@@ -73,7 +73,7 @@ class Services:
                                if settings.pipelines_repo else None)
 
     async def context(self, graph: dict) -> dict:
-        """What validating a graph needs besides the graph: profiles, schemaRegistry types, operator.yaml files."""
+        """What validating a graph needs besides the graph: profiles, schema-registry types, operator.yaml files."""
         configs = graph.get("configs") or {}
         ctx: dict = {"configs": None, "configs_error": None, "types": None,
                      "decls": declarations(graph, self.watcher.processors.values())}
@@ -183,7 +183,7 @@ def create_app(services: Services | None = None, start_watcher: bool = True) -> 
 
     @app.get("/api/catalog")
     async def catalog(request: Request, repo: str | None = None, ref: str | None = None):
-        """What manifests can refer to (read-only): connection profiles and schemaRegistry types."""
+        """What manifests can refer to (read-only): connection profiles and schema-registry types."""
         s = svc(request)
         out: dict = {"profiles": {}, "types": [], "configs": None, "errors": {}}
         try:

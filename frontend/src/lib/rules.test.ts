@@ -6,8 +6,8 @@ const info = (name: string, input: string, output: string, tagged?: [string, str
   const branch = { ref: "abc", label: "main@abc", kind: "branch" as const, commit: "abc", committed_date: null, input, output, source: "operator.yaml", warnings: [], web_url: "", runtime: "dotnet" as const };
   const tag = tagged && { ...branch, ref: "v1.0.0", label: "v1.0.0", kind: "tag" as const, commit: "def", input: tagged[0], output: tagged[1] };
   return {
-    id: `foundry-platform/operators/${name}:`, project: `foundry-platform/operators/${name}`, path: "", name, description: "",
-    repo: `https://gitlab.com/foundry-platform/operators/${name}.git`, web_url: "", input, output, warnings: [],
+    id: `foundry-platform/example-operators/${name}:`, project: `foundry-platform/example-operators/${name}`, path: "", name, description: "",
+    repo: `https://gitlab.com/foundry-platform/example-operators/${name}.git`, web_url: "", input, output, warnings: [],
     latest: tag ? "v1.0.0" : "abc", head: "abc", versions: tag ? [tag, branch] : [branch], runtime: "dotnet",
   };
 };
@@ -15,7 +15,7 @@ const processors: Processors = Object.fromEntries(
   [info("XmlToJson", "XmlPackets", "Packets"), info("Decode", "Packets", "EnrichedPackets", ["XmlPackets", "Packets"])].map((i) => [i.id, i]),
 );
 const t = (id: string, Ref?: string): GraphNode => ({
-  id, kind: "processor", processor: { Repo: `https://gitlab.com/foundry-platform/operators/${id}.git`, ...(Ref ? { Ref } : {}) },
+  id, kind: "processor", processor: { Repo: `https://gitlab.com/foundry-platform/example-operators/${id}.git`, ...(Ref ? { Ref } : {}) },
 });
 const d = (name: string, ...AllowedTypes: string[]): GraphNode => ({
   id: `dataset:${name}`, kind: "dataset", dataset: name, datasetSpec: { Config: "kafka/prod", AllowedTypes, Topic: name.toLowerCase() },

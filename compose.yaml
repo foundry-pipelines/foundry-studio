@@ -1,4 +1,4 @@
-# docker compose up --build   (needs vendor/scripts checked out: git submodule update --init)
+# docker compose up --build   (needs vendor/foundry-ci checked out: git submodule update --init)
 # Offline: set the image and index variables below (shell or .env) to the internal registries.
 services:
   studio:

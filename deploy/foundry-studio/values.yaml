@@ -1,5 +1,5 @@
 image:
-  repository: registry.gitlab.com/foundry-platform/foundrystudio
+  repository: registry.gitlab.com/foundry-platform/foundry-studio
   tag: latest                   # CI sets the commit SHA
   pullPolicy: IfNotPresent      # tags are commit SHAs
 envSecret: foundry-studio-env   # GITLAB_TOKEN etc.
