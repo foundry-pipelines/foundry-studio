@@ -1,0 +1,22 @@
+# docker compose up --build   (needs vendor/scripts checked out: git submodule update --init)
+# Offline: set the image and index variables below (shell or .env) to the internal registries.
+services:
+  studio:
+    build:
+      context: .
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:20-slim}
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12}
+        NPM_REGISTRY: ${NPM_REGISTRY:-}
+        PYPI_INDEX: ${PYPI_INDEX:-}
+    image: ${STUDIO_IMAGE:-foundry-studio:latest}
+    ports: ["8000:8000"]
+    environment:
+      GITLAB_URL: ${GITLAB_URL:-https://gitlab.com}
+      GITLAB_TOKEN: ${GITLAB_TOKEN:-}
+      GITLAB_WEBHOOK_SECRET: ${GITLAB_WEBHOOK_SECRET:-}
+    volumes:
+      - workspace:/opt/foundry-studio/workspace
+
+volumes:
+  workspace:
