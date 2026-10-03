@@ -56,7 +56,7 @@ MANIFEST = f"""\
 Name: EnrichmentPipeline
 
 ConfigRegistry:
-  Repo: https://gitlab.com/{CONFIGS}.git
+  Repo: {CONFIGS}
   Ref: main
 
 Kafkas:
@@ -77,15 +77,15 @@ Kafkas:
 
 Processors:
   XmlToJson:
-    Repo: https://gitlab.com/{OPERATORS}/xmltojsonprocessor.git
+    Repo: {OPERATORS}/xmltojsonprocessor
     Ref: main
 
   Decode:
-    Repo: https://gitlab.com/{OPERATORS}/decodingprocessor.git
+    Repo: {OPERATORS}/decodingprocessor
     Ref: main
 
   Isp:
-    Repo: https://gitlab.com/{OPERATORS}/IspEnricher.git
+    Repo: {OPERATORS}/IspEnricher
     Ref: main
 
 Flow:

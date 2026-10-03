@@ -39,9 +39,12 @@ class Sources:
         self.type_names: set[str] = set()  # last known, for synchronous callers (discovery)
 
     def project_of(self, repo: str) -> str:
-        """https://gitlab.com/foundry-platform/common/configRegistry.git -> foundry-platform/common/configRegistry (on this GitLab only)."""
+        """A Repo's project on this GitLab: a project path as it is, or a URL of this GitLab without its host
+        (https://gitlab.com/foundry-platform/common/configRegistry.git -> foundry-platform/common/configRegistry)."""
         base = self.gitlab_url.split("://", 1)[-1]
         url = repo.strip().split("://", 1)[-1].removesuffix("/").removesuffix(".git")
+        if "://" not in repo:
+            return url
         if not url.startswith(f"{base}/"):
             raise SourceError(f"{repo} isn't on {self.gitlab_url}")
         return url[len(base) + 1:]

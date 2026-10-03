@@ -45,13 +45,13 @@ async def test_errors(fake, foundry):
         await s.configs("https://github.com/x/configs.git")
     with pytest.raises(SourceError, match="not found"):
         await s.configs(ref="v9")
-    assert s.project_of("https://gitlab.com/a/b.git/") == "a/b"
+    assert s.project_of("https://gitlab.com/a/b.git/") == "a/b" == s.project_of("a/b")
 
 
 def test_catalog_endpoint(services):
     with TestClient(create_app(services, start_watcher=False)) as c:
         cat = c.get("/api/catalog").json()
         assert list(cat["profiles"]) == ["kafka/load", "kafka/prod"] and cat["errors"] == {}
-        assert cat["configs"]["repo"] == "https://gitlab.com/foundry-platform/common/configRegistry.git"
+        assert cat["configs"]["repo"] == "foundry-platform/common/configRegistry"
         assert cat["types"] == sorted(demo.TYPES)
         assert "configs" in c.get("/api/catalog?ref=nope").json()["errors"]

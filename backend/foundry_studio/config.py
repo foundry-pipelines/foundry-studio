@@ -32,10 +32,10 @@ class Settings:
     # workspace is a plain folder (the default with a fake GitLab).
     pipelines_repo: str | None = "https://gitlab.com/foundry-platform/pipelines.git"
     # Connection profiles (kafka/<name>.json) for manifests without ConfigRegistry.Repo, and new ones.
-    configs_repo: str = "https://gitlab.com/foundry-platform/common/configRegistry.git"
+    configs_repo: str = "foundry-platform/common/configRegistry"
     # schemaRegistry: its types (folders with a metadata.yaml) are the names AllowedTypes and
     # operator.yaml in/out may use.
-    schema_registry_repo: str = "https://gitlab.com/foundry-platform/common/schemaRegistry.git"
+    schema_registry_repo: str = "foundry-platform/common/schemaRegistry"
     # "demo" or a directory: serve GitLab from local git repos instead of gitlab.com.
     fake_gitlab: str | None = None
     # Kafka credentials for the live feed, laid out like the processor runtime's:
@@ -68,9 +68,8 @@ class Settings:
             s.scripts_dir = Path(env["FOUNDRY_SCRIPTS_DIR"]).resolve()
         if env.get("STUDIO_WORKSPACE"):
             s.workspace = Path(env["STUDIO_WORKSPACE"]).expanduser().resolve()
-        s.configs_repo = env.get("STUDIO_CONFIGS_REPO", f"{s.gitlab_url}/foundry-platform/common/configRegistry.git")
-        s.schema_registry_repo = env.get("STUDIO_SCHEMA_REGISTRY_REPO",
-                                         f"{s.gitlab_url}/foundry-platform/common/schemaRegistry.git")
+        s.configs_repo = env.get("STUDIO_CONFIGS_REPO", s.configs_repo)
+        s.schema_registry_repo = env.get("STUDIO_SCHEMA_REGISTRY_REPO", s.schema_registry_repo)
         s.fake_gitlab = env.get("STUDIO_FAKE_GITLAB") or None
         if "STUDIO_PIPELINES_REPO" in env or s.fake_gitlab:
             s.pipelines_repo = env.get("STUDIO_PIPELINES_REPO") or None

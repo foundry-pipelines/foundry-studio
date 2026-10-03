@@ -10,6 +10,7 @@ name), never produced.
 
 from __future__ import annotations
 
+import re
 import tempfile
 from collections.abc import Iterable
 from pathlib import Path
@@ -22,8 +23,9 @@ from .manifest import graph_to_manifest, wiring
 from .sources import Sources
 
 
-def _norm_repo(url: str | None) -> str:
-    return (url or "").strip().lower().removesuffix("/").removesuffix(".git")
+def _norm_repo(repo: str | None) -> str:
+    """A project path and a URL of the same project compare equal."""
+    return re.sub(r"^https?://[^/]+/", "", (repo or "").strip().lower()).removesuffix("/").removesuffix(".git")
 
 
 def find_info(spec: dict | None, infos: Iterable[ProcessorInfo]) -> ProcessorInfo | None:

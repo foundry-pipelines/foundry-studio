@@ -177,7 +177,7 @@ class Discovery:
         name = head_decl.name or (posixpath.basename(path) if path else None) or project
         return ProcessorInfo(
             id=f"{project}:{path}", project=project, path=path, name=name, description=head_decl.description,
-            repo=proj["http_url_to_repo"], web_url=f"{web}/-/tree/{proj['default_branch']}/{path}".rstrip("/"),
+            repo=project, web_url=f"{web}/-/tree/{proj['default_branch']}/{path}".rstrip("/"),
             input=latest.input, output=latest.output, warnings=head_decl.warnings,
             latest=latest.ref, head=head["id"], versions=versions, runtime=latest.runtime,
         )

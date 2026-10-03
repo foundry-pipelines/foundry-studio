@@ -18,10 +18,12 @@ export function compareSemver(a: string, b: string): number {
   return 0;
 }
 
-const normRepo = (url: string | undefined) =>
-  (url ?? "")
+// A project path and a URL of the same project compare equal.
+const normRepo = (repo: string | undefined) =>
+  (repo ?? "")
     .trim()
     .toLowerCase()
+    .replace(/^https?:\/\/[^/]+\//, "")
     .replace(/\.git$/, "")
     .replace(/\/$/, "");
 

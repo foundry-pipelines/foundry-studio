@@ -65,6 +65,7 @@ describe("versions", () => {
   it("matches nodes to discovered processors by repo and path", () => {
     const i = info([v("Base64Decoder/v0.4.2", "v0.4.2", "tag", "a")]);
     expect(findInfo({ Repo: "https://gitlab.com/yume02kki/skywalker", Path: "Base64Decoder/" }, [i])).toBe(i);
+    expect(findInfo({ Repo: "yume02kki/skywalker", Path: "Base64Decoder" }, [i])).toBe(i); // a project path
     expect(findInfo({ Repo: "https://gitlab.com/yume02kki/skywalker.git", Path: "XmlToJson" }, [i])).toBeUndefined();
   });
 });

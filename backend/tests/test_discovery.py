@@ -33,7 +33,7 @@ async def test_one_processor_per_repo_root(fake):
     x = found[f"{XMLTOJSON}:"]
     assert (x.name, x.input, x.output, x.latest, x.path) == ("XmlToJson", "XmlPackets", "Packets", "v1.0.0", "")
     assert not x.warnings and x.description.startswith("Converts XML")
-    assert x.repo == f"https://gitlab.com/{XMLTOJSON}.git"
+    assert x.repo == XMLTOJSON
     assert [v.kind for v in x.versions] == ["tag", "branch"]
     assert x.versions[-1].ref == x.head and len(x.head) == 40
 
