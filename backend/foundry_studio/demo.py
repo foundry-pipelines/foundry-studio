@@ -7,7 +7,7 @@
 
 The repos mirror the real ones: foundry-platform/registries/config-registry (connection profiles),
 foundry-platform/registries/schema-registry (the type names) and one foundry-platform/example-operators
-project per processor, each with an operator.yaml at its root. The
+project per operator, each with an operator.yaml at its root. The
 workspace holds PacketPipeline. Nothing here needs a token, Docker or Kafka; Live data shows
 generated records.
 """
@@ -26,7 +26,7 @@ from .config import REPO_ROOT
 DEFAULT_ROOT = REPO_ROOT / ".demo-gitlab"
 CONFIGS = "foundry-platform/registries/config-registry"
 SCHEMA_REGISTRY = "foundry-platform/registries/schema-registry"
-OPERATORS = "foundry-platform/example-operators"
+OPERATORS_GROUP = "foundry-platform/example-operators"
 
 # Fixed dates keep commit SHAs identical across `init` runs.
 FIXED_DATE = "2026-09-01T12:00:00+00:00"
@@ -42,12 +42,12 @@ TYPES = {  # type -> owner; EnrichedPackets has no schema, like the real one
     "IspEnrichment": "isp-enricher", "EnrichedPackets": "packet-joiner",
 }
 REGISTRY_FILES = {
-    **{f"{t}/metadata.yaml": f"owner: {o}\n" + ("ignoreSchema: true\n" if t == "EnrichedPackets" else "")
+    **{f"{t}/metadata.yaml": f"owner: {OPERATORS_GROUP}/{o}\n" + ("ignoreSchema: true\n" if t == "EnrichedPackets" else "")
        for t, o in TYPES.items()},
     **{f"{t}/v1.json": ('{\n  "title": "%s",\n  "type": "object",\n  "properties": {"guid": {"type": "string", "format": "guid"}}\n}\n' % t)
        for t in TYPES if t != "EnrichedPackets"},
 }
-PROCESSORS = {  # project -> (name, in, out, description)
+OPERATORS = {  # project -> (name, in, out, description)
     "xml-parser": ("XmlToJson", "XmlPackets", "Packets", "Converts XML packets to JSON; data stays base64."),
     "decoder": ("Decode", "Packets", "EnrichedPackets", "Decodes the base64 payload to text."),
     "isp-enricher": ("Isp", "Packets", "EnrichedPackets", "Adds the ISP of host_ip, from CIDR ranges in appsettings."),
@@ -75,17 +75,17 @@ Kafkas:
     AllowedTypes: [EnrichedPackets]
     Topic: packets.enriched
 
-Processors:
+Operators:
   XmlToJson:
-    Repo: {OPERATORS}/xml-parser
+    Repo: {OPERATORS_GROUP}/xml-parser
     Ref: main
 
   Decode:
-    Repo: {OPERATORS}/decoder
+    Repo: {OPERATORS_GROUP}/decoder
     Ref: main
 
   Isp:
-    Repo: {OPERATORS}/isp-enricher
+    Repo: {OPERATORS_GROUP}/isp-enricher
     Ref: main
 
 Flow:
@@ -116,9 +116,9 @@ def _git(repo: Path, *args: str, date: str | None = None) -> str:
     return res.stdout.strip()
 
 
-def processor_files(name: str, input: str, output: str, version: str = "1.0.0",
+def operator_files(name: str, input: str, output: str, version: str = "1.0.0",
                       description: str | None = None) -> dict[str, str]:
-    """A processor repo in the shape of the real ones (minimal: no Kafka loop)."""
+    """An operator repo in the shape of the real ones (minimal: no Kafka loop)."""
     return {
         "operator.yaml": (f"name: {name}\ndescription: {description or name}\nRuntime: dotnet\n\n"
                            f"in: [{input}]\nout: [{output}]\n"),
@@ -127,7 +127,7 @@ def processor_files(name: str, input: str, output: str, version: str = "1.0.0",
             f"    <Version>{version}</Version>\n  </PropertyGroup>\n  <ItemGroup>\n"
             '    <PackageReference Include="Foundry.MetaSettings" Version="2.*" />\n  </ItemGroup>\n</Project>\n'),
         "Program.cs": (f"// Demo stand-in: {input} -> {output}.\n"
-                       f"static {output} Processor({input} p) => new() {{ Guid = p.Guid }};\n"),
+                       f"static {output} Operator({input} p) => new() {{ Guid = p.Guid }};\n"),
     }
 
 
@@ -150,8 +150,8 @@ def init(root: Path = DEFAULT_ROOT) -> Path:
         shutil.rmtree(root)
     _repo(root, CONFIGS, PROFILES, "Kafka connection profiles")
     _repo(root, SCHEMA_REGISTRY, REGISTRY_FILES, "Pipeline types")
-    for project, (name, i, o, desc) in PROCESSORS.items():
-        _repo(root, f"{OPERATORS}/{project}", processor_files(name, i, o, description=desc), f"{name} 1.0.0", "v1.0.0")
+    for project, (name, i, o, desc) in OPERATORS.items():
+        _repo(root, f"{OPERATORS_GROUP}/{project}", operator_files(name, i, o, description=desc), f"{name} 1.0.0", "v1.0.0")
     # A plain folder (not a git repo), so the fake GitLab doesn't list it as a project.
     (workspace(root) / "PacketPipeline").mkdir(parents=True)
     (workspace(root) / "PacketPipeline" / "PipelineManifest.yaml").write_text(MANIFEST)
@@ -159,7 +159,7 @@ def init(root: Path = DEFAULT_ROOT) -> Path:
 
 
 def tag(root: Path, project: str, version: str) -> str:
-    repo = root / OPERATORS / project
+    repo = root / OPERATORS_GROUP / project
     csproj = next(repo.glob("*.csproj"))
     csproj.write_text(re.sub(r"<Version>[^<]*</Version>", f"<Version>{version.lstrip('v')}</Version>",
                              csproj.read_text()))
@@ -170,13 +170,13 @@ def tag(root: Path, project: str, version: str) -> str:
 
 
 def add(root: Path, name: str, input: str, output: str, description: str | None = None) -> None:
-    _repo(root, f"{OPERATORS}/{name}", processor_files(name, input, output, "0.1.0", description), f"Add {name}")
+    _repo(root, f"{OPERATORS_GROUP}/{name}", operator_files(name, input, output, "0.1.0", description), f"Add {name}")
 
 
 def remove(root: Path, name: str) -> None:
-    repo = root / OPERATORS / name
+    repo = root / OPERATORS_GROUP / name
     _git(repo, "rm", "-q", "operator.yaml")
-    _git(repo, "commit", "-q", "-m", f"{name} is no longer a processor")
+    _git(repo, "commit", "-q", "-m", f"{name} is no longer an operator")
 
 
 def main(argv=None) -> None:

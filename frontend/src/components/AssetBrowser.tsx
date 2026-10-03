@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { schemaColor } from "../lib/schemaColor";
 import { useStudio } from "../store";
-import type { ProcessorInfo } from "../types";
+import type { OperatorInfo } from "../types";
 import { DRAG_MIME } from "./Canvas";
 import { Datasets } from "./Datasets";
 import { LiveData, LiveTabBadges } from "./LiveData";
@@ -32,26 +32,26 @@ interface TreeEntry {
   path: string;
   label: string;
   depth: number;
-  kind: "repo" | "folder" | "processor";
+  kind: "repo" | "folder" | "operator";
   title: string;
 }
 
 /**
- * The tree shows processors, not raw git directories: a repo, the folders that only
- * group processors, and each processor (a crate directory) under its own name.
- * A repo that is a single processor is just that processor.
+ * The tree shows operators, not raw git directories: a repo, the folders that only
+ * group operators, and each operator (a crate directory) under its own name.
+ * A repo that is a single operator is just that operator.
  */
-function processorEntry(project: string, path: string, depth: number, t: ProcessorInfo): TreeEntry {
-  return { key: `${project}:${path}`, project, path, label: t.name, depth, kind: "processor",
+function operatorEntry(project: string, path: string, depth: number, t: OperatorInfo): TreeEntry {
+  return { key: `${project}:${path}`, project, path, label: t.name, depth, kind: "operator",
            title: `${t.input ?? "?"} → ${t.output ?? "?"}${t.description ? `\n${t.description}` : ""}` };
 }
 
-function treeEntries(projects: string[], processors: ProcessorInfo[]): TreeEntry[] {
+function treeEntries(projects: string[], operators: OperatorInfo[]): TreeEntry[] {
   const out: TreeEntry[] = [];
   for (const project of projects) {
-    const mine = processors.filter((t) => t.project === project);
+    const mine = operators.filter((t) => t.project === project);
     if (mine.length === 1 && !mine[0].path) {
-      out.push(processorEntry(project, "", 0, mine[0]));
+      out.push(operatorEntry(project, "", 0, mine[0]));
       continue;
     }
     out.push({ key: `${project}:`, project, path: "", label: project.split("/").pop() ?? project, depth: 0, kind: "repo", title: project });
@@ -67,7 +67,7 @@ function treeEntries(projects: string[], processors: ProcessorInfo[]): TreeEntry
       const depth = path ? path.split("/").length : 1;
       out.push(
         t
-          ? processorEntry(project, path, depth, t)
+          ? operatorEntry(project, path, depth, t)
           :{ key: `${project}:${path}`, project, path, label: path.split("/").pop()!, depth, kind: "folder", title: path },
       );
     }
@@ -83,9 +83,9 @@ function SchemaChip({ schema }: { schema: string | null }) {
   );
 }
 
-function Card({ t, favorite, onFavorite }: { t: ProcessorInfo; favorite: boolean; onFavorite: () => void }) {
+function Card({ t, favorite, onFavorite }: { t: OperatorInfo; favorite: boolean; onFavorite: () => void }) {
   const changed = useStudio((s) => s.changed[t.id]);
-  // Cards add the processor on its default branch; pin a version on the node.
+  // Cards add the operator on its default branch; pin a version on the node.
   const version = t.versions.find((v) => v.kind === "branch") ?? t.versions[0];
   const fresh = changed && Date.now() - changed.at < 15000;
 
@@ -110,7 +110,7 @@ function Card({ t, favorite, onFavorite }: { t: ProcessorInfo; favorite: boolean
         </button>
       </div>
       <div className="card-types">
-        {/* One line per input type (a processor reading several), then what it writes. */}
+        {/* One line per input type (an operator reading several), then what it writes. */}
         <span className="card-inputs">
           {(schemaList(version.input) ?? [version.input]).map((s, i) => (
             <SchemaChip key={i} schema={s} />
@@ -134,7 +134,7 @@ function Card({ t, favorite, onFavorite }: { t: ProcessorInfo; favorite: boolean
 }
 
 export function AssetBrowser() {
-  const processors = useStudio((s) => s.processors);
+  const operators = useStudio((s) => s.operators);
   const health = useStudio((s) => s.health);
   const watcher = useStudio((s) => s.watcher);
   const tab = useStudio((s) => s.bottomTab);
@@ -150,8 +150,8 @@ export function AssetBrowser() {
     return () => clearInterval(t);
   }, []);
 
-  const list = useMemo(() => Object.values(processors).sort((a, b) => a.name.localeCompare(b.name)), [processors]);
-  const projects = health?.processorProjects ?? [...new Set(list.map((t) => t.project))];
+  const list = useMemo(() => Object.values(operators).sort((a, b) => a.name.localeCompare(b.name)), [operators]);
+  const projects = health?.operatorProjects ?? [...new Set(list.map((t) => t.project))];
   const tree = useMemo(() => treeEntries(projects, list), [projects, list]);
 
   const toggleFavorite = (id: string) => {
@@ -172,7 +172,7 @@ export function AssetBrowser() {
     return [t.name, t.path, t.description, t.input, t.output].some((v) => v?.toLowerCase().includes(q));
   });
   const crumbs =
-    selected === FAVORITES ? ["Favorites"] : selected ? selected.replace(":", "/").split("/").filter(Boolean) : ["All processors"];
+    selected === FAVORITES ? ["Favorites"] : selected ? selected.replace(":", "/").split("/").filter(Boolean) : ["All operators"];
   const errors = Object.entries(watcher?.errors ?? {});
 
   return (
@@ -180,11 +180,11 @@ export function AssetBrowser() {
       <div className="panel-tabs" role="tablist">
         <button
           role="tab"
-          className={`tab${tab === "processors" ? " active" : ""}`}
-          onClick={() => useStudio.setState({ bottomTab: "processors" })}
-          data-testid="tab-processors"
+          className={`tab${tab === "operators" ? " active" : ""}`}
+          onClick={() => useStudio.setState({ bottomTab: "operators" })}
+          data-testid="tab-operators"
         >
-          Processors
+          Operators
         </button>
         <button
           role="tab"
@@ -203,10 +203,10 @@ export function AssetBrowser() {
           Live data <LiveTabBadges />
         </button>
         <span className="tab-spacer" />
-        {tab === "processors" ? (
+        {tab === "operators" ? (
           <input
             className="search"
-            placeholder="Search processors"
+            placeholder="Search operators"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             data-testid="asset-search"
@@ -235,7 +235,7 @@ export function AssetBrowser() {
             <span className="fav">★</span> Favorites
           </div>
           {favorites
-            .map((id) => processors[id])
+            .map((id) => operators[id])
             .filter(Boolean)
             .map((t) => (
               <div key={t.id} className="tree-item depth-1 muted" onClick={() => setSelected(`${t.project}:${t.path}`)}>
@@ -246,7 +246,7 @@ export function AssetBrowser() {
             className={`tree-item tree-root${selected === null ? " active" : ""}`}
             onClick={() => setSelected(null)}
           >
-            ▾ Processors
+            ▾ Operators
           </div>
           {tree.map((f) => (
             <div
@@ -256,7 +256,7 @@ export function AssetBrowser() {
               title={f.title}
               data-testid={`tree-${f.project}/${f.path}`}
             >
-              <span className="tree-icon">{f.kind === "processor" ? "⚙" : "📁"}</span>
+              <span className="tree-icon">{f.kind === "operator" ? "⚙" : "📁"}</span>
               {f.label}
             </div>
           ))}
@@ -265,7 +265,7 @@ export function AssetBrowser() {
           <div className="crumbs">
             {crumbs.join(" › ")}
             <span className="crumbs-right">
-              {shown.length} processor{shown.length === 1 ? "" : "s"} · drag onto the canvas
+              {shown.length} operator{shown.length === 1 ? "" : "s"} · drag onto the canvas
             </span>
           </div>
           {errors.length > 0 && (
@@ -281,7 +281,7 @@ export function AssetBrowser() {
             {shown.map((t) => (
               <Card key={t.id} t={t} favorite={favorites.includes(t.id)} onFavorite={() => toggleFavorite(t.id)} />
             ))}
-            {shown.length === 0 && <div className="empty">No processors here.</div>}
+            {shown.length === 0 && <div className="empty">No operators here.</div>}
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 """Live feed: a read-only peek at a sink topic, to see whether data is flowing.
 
-The consumer config mirrors foundry-processor's `client_config` (same keys, same
+The consumer config mirrors foundry-operator's `client_config` (same keys, same
 librdkafka settings, credentials from `$FOUNDRY_SECRETS_DIR/<SecretRef>/username|password`),
 with two deliberate differences so peeking can never disturb the pipeline:
 
@@ -9,7 +9,7 @@ with two deliberate differences so peeking can never disturb the pipeline:
 * it never commits offsets.
 
 It starts a few messages before the end of each partition (recent history), then follows
-new messages. Each message's type (its `foundry-type` header, stamped by the processor that
+new messages. Each message's type (its `foundry-type` header, stamped by the operator that
 wrote it) is checked against the Kafka's AllowedTypes; nothing checks the shape of the data.
 """
 
@@ -44,13 +44,13 @@ def _str(value) -> str:
 
 def bind(settings: dict, clusters: list[dict]) -> dict:
     """Swap the manifest's connection for this environment's, like the foundry watcher does
-    for processors: the cluster whose `match` equals Brokers supplies the connection."""
+    for operators: the cluster whose `match` equals Brokers supplies the connection."""
     cluster = next((c for c in clusters if c["match"] == (settings or {}).get("Brokers")), None)
     return dict(cluster["connection"]) if cluster else dict(settings or {})
 
 
 def client_config(settings: dict, secrets_dir: Path) -> dict:
-    """ConnectionSettings -> librdkafka consumer config, as the processor runtime builds it."""
+    """ConnectionSettings -> librdkafka consumer config, as the operator runtime builds it."""
     cfg: dict[str, str] = {}
     protocol = "plaintext"
     secret_ref = None
@@ -85,7 +85,7 @@ def client_config(settings: dict, secrets_dir: Path) -> dict:
             except OSError:
                 raise PeekError(
                     f"secret {secret_ref!r}: can't read {path}. Put the credentials in "
-                    f"$FOUNDRY_SECRETS_DIR/{secret_ref}/username and /password (as the processor runtime does)"
+                    f"$FOUNDRY_SECRETS_DIR/{secret_ref}/username and /password (as the operator runtime does)"
                 ) from None
     cfg.update({
         "group.id": f"foundry-studio-peek-{uuid.uuid4().hex[:12]}",
@@ -252,7 +252,7 @@ async def kafka_feed(cfg: dict, topic: str, checker: TypeChecker, stop: asyncio.
 # Kafka key) on every topic, rendered as that topic's type and a little later the further
 # downstream it is. Every 7th record's
 # data isn't UTF-8 text, so a Packets topic doesn't carry it, the way Base64Decoder
-# drops it. That lets the UI pair a processor's input and output records.
+# drops it. That lets the UI pair an operator's input and output records.
 # --------------------------------------------------------------------------- #
 
 DEMO_EPOCH = 1_790_000_000.0

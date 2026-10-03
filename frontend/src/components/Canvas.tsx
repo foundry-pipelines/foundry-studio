@@ -18,13 +18,13 @@ import { wires } from "../lib/sockets";
 import { useStudio, type PEdge, type PNode } from "../store";
 import type { DatasetSpec } from "../types";
 import { placeDataset } from "./Datasets";
-import { DatasetNode, ProcessorNode } from "./PipelineNode";
+import { DatasetNode, OperatorNode } from "./PipelineNode";
 import { ConnectionLine, DragTooltip, TopicEdge } from "./TopicEdge";
 
-export const DRAG_MIME = "application/x-foundry-processor";
+export const DRAG_MIME = "application/x-foundry-operator";
 export const DATASET_MIME = "application/x-foundry-dataset";
 
-const nodeTypes = { processor: ProcessorNode, dataset: DatasetNode };
+const nodeTypes = { operator: OperatorNode, dataset: DatasetNode };
 const edgeTypes = { topic: TopicEdge };
 
 /** Ask the validators (through the backend) whether source -> target is acceptable; refuse with its message. */
@@ -49,19 +49,19 @@ export function Canvas() {
   const focus = useStudio((s) => s.focus);
   const onNodesChange = useStudio((s) => s.onNodesChange);
   const onConnectionsChange = useStudio((s) => s.onEdgesChange);
-  const processors = useStudio((s) => s.processors);
+  const operators = useStudio((s) => s.operators);
   const flow = useReactFlow<PNode, PEdge>();
 
   // Each connection drawn as one wire per schema it carries, between that schema's sockets.
   const drawn = useMemo(() => {
     const spec = (id: string) => nodes.find((n) => n.id === id)?.data.spec;
     return edges.flatMap((e) =>
-      wires(spec(e.source), spec(e.target), processors).map((w): PEdge => ({
+      wires(spec(e.source), spec(e.target), operators).map((w): PEdge => ({
         ...e, id: `${e.id}|${w.sourceHandle}|${w.targetHandle}`, sourceHandle: w.sourceHandle, targetHandle: w.targetHandle,
         data: { schema: w.schema, connection: e.id },
       })),
     );
-  }, [edges, nodes, processors]);
+  }, [edges, nodes, operators]);
 
   // Selecting or deleting a wire selects or deletes its connection.
   const onEdgesChange = useCallback(
@@ -98,7 +98,7 @@ export function Canvas() {
   const isValidConnection: IsValidConnection<PEdge> = useCallback(
     (c) => {
       const s = useStudio.getState();
-      return checkConnection(s.graph(), s.processors, c.source, c.target).ok;
+      return checkConnection(s.graph(), s.operators, c.source, c.target).ok;
     },
     [],
   );
@@ -114,7 +114,7 @@ export function Canvas() {
     const [source, target] =
       state.fromHandle.type === "source" ? [state.fromNode.id, state.toNode.id] : [state.toNode.id, state.fromNode.id];
     const s = useStudio.getState();
-    const check = checkConnection(s.graph(), s.processors, source, target);
+    const check = checkConnection(s.graph(), s.operators, source, target);
     if (!check.ok && check.kind !== "duplicate") void confirmEdge(source, target, check.reason);
   }, []);
 
@@ -140,9 +140,9 @@ export function Canvas() {
       if (!raw) return;
       e.preventDefault();
       const { id, ref } = JSON.parse(raw) as { id: string; ref: string };
-      const info = s.processors[id];
+      const info = s.operators[id];
       if (!info || !s.meta) return;
-      s.addProcessor(info, ref, { x: p.x - 90, y: p.y - 40 });
+      s.addOperator(info, ref, { x: p.x - 90, y: p.y - 40 });
     },
     [flow],
   );

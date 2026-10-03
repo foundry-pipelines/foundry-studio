@@ -12,10 +12,10 @@ from foundry_studio.fake_gitlab import FakeGitLab
 from foundry_studio.foundry import Foundry
 
 SCRIPTS_DIR = REPO_ROOT / "vendor" / "foundry-ci"
-XMLTOJSON = f"{demo.OPERATORS}/xml-parser"
-DECODE = f"{demo.OPERATORS}/decoder"
-ISP = f"{demo.OPERATORS}/isp-enricher"
-PROCESSOR_PROJECTS = [XMLTOJSON, DECODE, ISP]
+XMLTOJSON = f"{demo.OPERATORS_GROUP}/xml-parser"
+DECODE = f"{demo.OPERATORS_GROUP}/decoder"
+ISP = f"{demo.OPERATORS_GROUP}/isp-enricher"
+OPERATOR_PROJECTS = [XMLTOJSON, DECODE, ISP]
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def foundry() -> Foundry:
 
 @pytest.fixture
 def demo_root(tmp_path: Path, monkeypatch) -> Path:
-    """Local stand-ins for configs and the processor repos, and a workspace."""
+    """Local stand-ins for configs and the operator repos, and a workspace."""
     root = demo.init(tmp_path / "gitlab")
     env = dict(os.environ)
     gitenv.configure(env, gitlab_url="https://gitlab.com", fake_root=root,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ProcessorInfo, Version } from "../types";
+import type { OperatorInfo, Version } from "../types";
 import { compareSemver, findInfo, updateFor, versionFor } from "./versions";
 
 const v = (ref: string, label: string, kind: "tag" | "branch", commit: string): Version => ({
@@ -16,7 +16,7 @@ const v = (ref: string, label: string, kind: "tag" | "branch", commit: string): 
   runtime: "dotnet",
 });
 
-const info = (versions: Version[]): ProcessorInfo => ({
+const info = (versions: Version[]): OperatorInfo => ({
   id: "yume02kki/skywalker:Base64Decoder",
   project: "yume02kki/skywalker",
   path: "Base64Decoder",
@@ -62,7 +62,7 @@ describe("versions", () => {
     expect(updateFor(i, undefined)).toBeUndefined();
   });
 
-  it("matches nodes to discovered processors by repo and path", () => {
+  it("matches nodes to discovered operators by repo and path", () => {
     const i = info([v("Base64Decoder/v0.4.2", "v0.4.2", "tag", "a")]);
     expect(findInfo({ Repo: "https://gitlab.com/yume02kki/skywalker", Path: "Base64Decoder/" }, [i])).toBe(i);
     expect(findInfo({ Repo: "yume02kki/skywalker", Path: "Base64Decoder" }, [i])).toBe(i); // a project path

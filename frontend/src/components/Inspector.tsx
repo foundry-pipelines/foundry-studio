@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api";
-import { inputsOf, outputsOf, processorschemas, runtimeOf, schemaLabel } from "../lib/rules";
+import { inputsOf, outputsOf, operatorschemas, runtimeOf, schemaLabel } from "../lib/rules";
 import { edgeDataset } from "../lib/stages";
 import { schemaColor } from "../lib/schemaColor";
 import { findInfo, headVersion, versionFor } from "../lib/versions";
@@ -199,18 +199,18 @@ function NameField({ id, label, hint }: { id: string; label: string; hint: strin
   );
 }
 
-function ProcessorInspector({ node }: { node: GraphNode }) {
+function OperatorInspector({ node }: { node: GraphNode }) {
   const updateSpec = useStudio((s) => s.updateSpec);
-  const processors = useStudio((s) => s.processors);
+  const operators = useStudio((s) => s.operators);
   const validation = useStudio((s) => s.validation);
   const graph = useStudio((s) => s.graph);
   const meta = useStudio((s) => s.meta);
   useStudio((s) => s.revision); // re-render on wiring changes
-  const spec = node.processor ?? {};
-  const info = findInfo(spec, Object.values(processors));
+  const spec = node.operator ?? {};
+  const info = findInfo(spec, Object.values(operators));
   const version = versionFor(info, spec.Ref);
   const branch = headVersion(info)?.label.split("@")[0] ?? "";
-  const { input, output } = processorschemas(node, processors);
+  const { input, output } = operatorschemas(node, operators);
   const reads = inputsOf(graph(), node.id);
   const writes = outputsOf(graph(), node.id);
   const commitUrl = info && version ? info.web_url.replace(/\/-\/tree\/.*$/, `/-/commit/${version.commit}`) : null;
@@ -218,10 +218,10 @@ function ProcessorInspector({ node }: { node: GraphNode }) {
   return (
     <>
       <h3>
-        Processor <span className="muted">· {node.id}</span>
+        Operator <span className="muted">· {node.id}</span>
       </h3>
       <Issues issues={issuesFor(validation, node.id)} />
-      <NameField id={node.id} label="Name" hint="Key under Processors: in the manifest" />
+      <NameField id={node.id} label="Name" hint="Key under Operators: in the manifest" />
       <Field label="Repo">
         <input value={spec.Repo ?? ""} readOnly />
       </Field>
@@ -238,8 +238,8 @@ function ProcessorInspector({ node }: { node: GraphNode }) {
             onChange={(e) => {
               const ref = e.target.value;
               updateSpec(node.id, (n) => {
-                const { Ref: _old, ...rest } = n.processor ?? {};
-                return { ...n, processor: ref ? { ...rest, Ref: ref } : rest };
+                const { Ref: _old, ...rest } = n.operator ?? {};
+                return { ...n, operator: ref ? { ...rest, Ref: ref } : rest };
               });
             }}
           >
@@ -265,7 +265,7 @@ function ProcessorInspector({ node }: { node: GraphNode }) {
         )}
       </Field>
       <Field label="Runtime" hint="From operator.yaml at this version">
-        <span className="mono" data-testid="processor-runtime">{runtimeOf(node, processors)}</span>
+        <span className="mono" data-testid="operator-runtime">{runtimeOf(node, operators)}</span>
       </Field>
       <Field label="Reads" hint="in: from operator.yaml at this version">
         <SchemaChip schema={input} />
@@ -274,12 +274,12 @@ function ProcessorInspector({ node }: { node: GraphNode }) {
         <SchemaChip schema={output} />
       </Field>
       <Field label="Reads from">
-        <span className="mono" data-testid="processor-reads">
+        <span className="mono" data-testid="operator-reads">
           {reads.join(", ") || "—"}
         </span>
       </Field>
       <Field label="Writes to">
-        <span className="mono" data-testid="processor-writes">
+        <span className="mono" data-testid="operator-writes">
           {writes.join(", ") || "—"}
         </span>
       </Field>
@@ -299,7 +299,7 @@ function ProcessorInspector({ node }: { node: GraphNode }) {
           </a>
         </p>
       )}
-      {!info && <p className="note">Not found among the discovered processors; its Ref and types can't be checked.</p>}
+      {!info && <p className="note">Not found among the discovered operators; its Ref and types can't be checked.</p>}
     </>
   );
 }
@@ -315,9 +315,9 @@ function DatasetInspector({ node }: { node: GraphNode }) {
   const profiles = Object.keys(catalog?.profiles ?? {});
   const types = catalog?.types ?? [];
   const g = graph();
-  const processors = g.nodes.filter((n) => n.kind === "processor").map((n) => n.id);
-  const writers = processors.filter((t) => outputsOf(g, t).includes(name));
-  const readers = processors.filter((t) => inputsOf(g, t).includes(name));
+  const operators = g.nodes.filter((n) => n.kind === "operator").map((n) => n.id);
+  const writers = operators.filter((t) => outputsOf(g, t).includes(name));
+  const readers = operators.filter((t) => inputsOf(g, t).includes(name));
   const [overrides, setOverrides] = useState(!!spec?.ConnectionSettings && Object.keys(spec.ConnectionSettings).length > 0);
   const set = (patch: Partial<DatasetSpec>) =>
     updateSpec(node.id, (n) => {
@@ -388,7 +388,7 @@ function DatasetInspector({ node }: { node: GraphNode }) {
   );
 }
 
-/** A connection (a Flow entry) is a processor reading or writing a Kafka. */
+/** A connection (a Flow entry) is an operator reading or writing a Kafka. */
 function EdgeInspector({ id }: { id: string }) {
   const validation = useStudio((s) => s.validation);
   const edge = useStudio((s) => s.edges.find((e) => e.id === id));
@@ -398,7 +398,7 @@ function EdgeInspector({ id }: { id: string }) {
   const { source, target } = edge;
   const name = edgeDataset(source, target);
   const reading = isDatasetNode(source);
-  const processor = reading ? target : source;
+  const operator = reading ? target : source;
   const spec = nodes.find((n) => n.id === datasetNode(name))?.data.spec.datasetSpec;
 
   return (
@@ -406,7 +406,7 @@ function EdgeInspector({ id }: { id: string }) {
       <h3>
         Connection{" "}
         <span className="muted">
-          · {processor} {reading ? "reads" : "writes"} {name}
+          · {operator} {reading ? "reads" : "writes"} {name}
         </span>
       </h3>
       <Issues issues={issuesFor(validation, undefined, [source, target])} />
@@ -417,8 +417,8 @@ function EdgeInspector({ id }: { id: string }) {
         <SchemaChip schema={schemaLabel(spec?.AllowedTypes)} />
       </Field>
       {reading && (
-        <Field label="Consumer group" hint="<pipeline Name>.<processor>">
-          <input value={`${meta?.name || "<pipeline>"}.${processor}`} readOnly className="mono" data-testid="edge-group" />
+        <Field label="Consumer group" hint="<pipeline Name>.<operator>">
+          <input value={`${meta?.name || "<pipeline>"}.${operator}`} readOnly className="mono" data-testid="edge-group" />
         </Field>
       )}
       <ProfileSettings profile={spec?.Config} />
@@ -477,7 +477,7 @@ export function Inspector() {
   let body: ReactNode;
   if (selectedNode) {
     const spec = selectedNode.data.spec;
-    body = spec.kind === "dataset" ? <DatasetInspector key={spec.id} node={spec} /> : <ProcessorInspector key={spec.id} node={spec} />;
+    body = spec.kind === "dataset" ? <DatasetInspector key={spec.id} node={spec} /> : <OperatorInspector key={spec.id} node={spec} />;
   } else if (selectedEdge) {
     body = <EdgeInspector id={selectedEdge.id} />;
   } else {

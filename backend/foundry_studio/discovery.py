@@ -1,6 +1,6 @@
-"""Processor discovery: find processor folders in GitLab projects and list their versions.
+"""Operator discovery: find operator folders in GitLab projects and list their versions.
 
-A processor is any folder with an `operator.yaml` (name, description, Runtime, in, out: lists of
+An operator is any folder with an `operator.yaml` (name, description, Runtime, in, out: lists of
 type names, the types in schema-registry). A version from before its folder had one
 carries a warning.
 """
@@ -58,7 +58,7 @@ class Version:
 
 
 @dataclass
-class ProcessorInfo:
+class OperatorInfo:
     id: str  # "<project>:<path>"
     project: str
     path: str
@@ -132,7 +132,7 @@ class Discovery:
         self._decl_cache[key] = decl
         return decl
 
-    async def scan_project(self, project: str) -> dict[str, ProcessorInfo]:
+    async def scan_project(self, project: str) -> dict[str, OperatorInfo]:
         proj = await self.gitlab.get_project(project)
         branch = proj["default_branch"]
         head = await self.gitlab.get_commit(project, branch)
@@ -145,7 +145,7 @@ class Discovery:
         infos = await asyncio.gather(*(self._crate(proj, head, path) for path in sorted(folders)))
         return {i.id: i for i in infos}
 
-    async def _crate(self, proj: dict, repo_head: dict, path: str) -> ProcessorInfo:
+    async def _crate(self, proj: dict, repo_head: dict, path: str) -> OperatorInfo:
         project = proj["path_with_namespace"]
         # The crate's newest default-branch version is the last commit that touched its folder.
         head = await self.gitlab.last_commit(project, repo_head["id"], path) or repo_head
@@ -175,7 +175,7 @@ class Discovery:
         ))
         latest = versions[0]
         name = head_decl.name or (posixpath.basename(path) if path else None) or project
-        return ProcessorInfo(
+        return OperatorInfo(
             id=f"{project}:{path}", project=project, path=path, name=name, description=head_decl.description,
             repo=project, web_url=f"{web}/-/tree/{proj['default_branch']}/{path}".rstrip("/"),
             input=latest.input, output=latest.output, warnings=head_decl.warnings,

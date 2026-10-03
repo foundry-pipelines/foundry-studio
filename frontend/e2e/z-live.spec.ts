@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 import { demo } from "./helpers";
 
 // Polling mode (the default 10 s interval): no webhooks, no reloads.
-test("a new tag and a new processor show up live; the picked version is saved as the Ref", async ({ page }) => {
+test("a new tag and a new operator show up live; the picked version is saved as the Ref", async ({ page }) => {
   await page.goto("/?pipeline=PacketPipeline");
   await expect(page.getByTestId("node-Decode")).toBeVisible();
   await expect(page.getByTestId("card-Decode")).toBeVisible();
@@ -22,7 +22,7 @@ test("a new tag and a new processor show up live; the picked version is saved as
   await expect(page.getByTestId("node-Decode")).toContainText("v1.1.0");
   await expect(page.getByTestId("update-Decode")).toHaveCount(0);
 
-  // A new repo with a operator.yaml appears as a card.
+  // A new repo with an operator.yaml appears as a card.
   demo("add", "Deduplicate", "Packets", "Packets", "Drops repeated guids");
   await expect(page.getByTestId("card-Deduplicate")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("card-Deduplicate")).toContainText("Packets");

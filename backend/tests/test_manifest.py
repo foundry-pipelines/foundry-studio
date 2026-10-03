@@ -33,14 +33,14 @@ def test_graph_shape():
     kafkas = {n["dataset"]: n["datasetSpec"] for n in graph["nodes"] if n["kind"] == "dataset"}
     assert kafkas["ConvertedPackets"] == {"Config": "kafka/prod", "AllowedTypes": ["Packets"], "Topic": "enrichment.packets"}
     isp = next(n for n in graph["nodes"] if n["id"] == "Isp")
-    assert isp["processor"] == {"Repo": "foundry-platform/example-operators/isp-enricher", "Ref": "main"}
+    assert isp["operator"] == {"Repo": "foundry-platform/example-operators/isp-enricher", "Ref": "main"}
     assert wiring(graph)["Isp"] == {"Inputs": ["ConvertedPackets"], "Outputs": ["Output"]}
 
 
 def test_canonical_form_orders_by_data_flow_and_keeps_extras():
     text = """\
 Name: P
-Processors:
+Operators:
   B: {Repo: r, Ref: v1.0.0}
   A: {Repo: r, Path: /sub/}
 Kafkas:
@@ -54,8 +54,8 @@ Future: 1
     out = graph_to_manifest(manifest_to_graph(text))
     data = yaml.safe_load(out)
     assert list(data["Kafkas"]) == ["Src", "Mid", "Sink", "Unused"]
-    assert list(data["Processors"]) == ["A", "B"]
-    assert data["Processors"]["A"] == {"Repo": "r", "Path": "sub"}
+    assert list(data["Operators"]) == ["A", "B"]
+    assert data["Operators"]["A"] == {"Repo": "r", "Path": "sub"}
     assert list(data["Kafkas"]["Sink"]["ConnectionSettings"]) == ["Brokers", "SecretRef"]
     assert data["Flow"] == ["Mid -> B", "B -> Sink", "Src -> A", "A -> Mid"]  # unchanged: kept as written
     assert yaml.safe_load(graph_to_manifest({**manifest_to_graph(text), "flow": []}))["Flow"] == [
@@ -65,7 +65,7 @@ Future: 1
     assert graph_to_manifest(manifest_to_graph(out)) == out
 
 
-def test_a_changed_flow_is_rewritten_grouped_by_processor():
+def test_a_changed_flow_is_rewritten_grouped_by_operator():
     graph = manifest_to_graph(demo.MANIFEST)
     graph["edges"] = [e for e in graph["edges"] if e["source"] != "Isp"]
     flow = graph_to_manifest(graph).split("Flow:\n")[1]
@@ -75,7 +75,7 @@ def test_a_changed_flow_is_rewritten_grouped_by_processor():
 
 
 def test_undefined_names_become_nodes_with_a_warning():
-    graph = manifest_to_graph("Name: P\nProcessors:\n  A: {Repo: r}\nFlow:\n  - Ghost -> A\n  - A -> Ghost2\n")
+    graph = manifest_to_graph("Name: P\nOperators:\n  A: {Repo: r}\nFlow:\n  - Ghost -> A\n  - A -> Ghost2\n")
     ghost = next(n for n in graph["nodes"] if n["id"] == "dataset:Ghost")
     assert ghost["datasetSpec"] is None
     assert graph["warnings"] == ["Flow uses Ghost, which isn't under Kafkas",
@@ -98,7 +98,7 @@ def test_the_real_pipeline_round_trips():
 
 def test_comments_survive_a_save():
     text = demo.MANIFEST.replace("  Input:\n", "  # where packets come in\n  Input: #mandatory\n", 1)
-    text = text.replace("Processors:\n", "Processors:\n  # first: XML to JSON\n  # (stateless)\n", 1)
+    text = text.replace("Operators:\n", "Operators:\n  # first: XML to JSON\n  # (stateless)\n", 1)
     text = text.replace("  Ref: main\n", "  Ref: main #non optional!\n", 1)
     again = graph_to_manifest(manifest_to_graph(text))
     assert again == text

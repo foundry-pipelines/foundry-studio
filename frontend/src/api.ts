@@ -7,7 +7,7 @@ import type {
   Layout,
   LoadedPipeline,
   PipelineListing,
-  ProcessorInfo,
+  OperatorInfo,
   ValidationResult,
   WatcherStatus,
   WorkspaceDataset,
@@ -52,7 +52,7 @@ type Saved = { path: string; layout: string; folder: string };
 
 export const api = {
   health: () => call<Health>("api/health"),
-  processors: () => call<{ processors: ProcessorInfo[]; status: WatcherStatus }>("api/processors"),
+  operators: () => call<{ operators: OperatorInfo[]; status: WatcherStatus }>("api/operators"),
   template: () => call<Graph>("api/template"),
   /** Profiles from the manifest's Configs repo (the default one without), and the schemas. */
   catalog: (configs: Graph["configs"] = {}) => {
@@ -116,13 +116,13 @@ export async function peek(graph: Graph, node: string, onEvent: (e: PeekEvent) =
 }
 
 export type ServerEvent =
-  | { type: "processor.added"; processor: ProcessorInfo }
-  | { type: "processor.updated"; processor: ProcessorInfo; newVersions: string[] }
-  | { type: "processor.removed"; id: string; name: string }
+  | { type: "operator.added"; operator: OperatorInfo }
+  | { type: "operator.updated"; operator: OperatorInfo; newVersions: string[] }
+  | { type: "operator.removed"; id: string; name: string }
   | { type: "watcher.status"; status: WatcherStatus }
   | { type: "pipelines.changed"; project: string };
 
-const EVENT_TYPES = ["processor.added", "processor.updated", "processor.removed", "watcher.status", "pipelines.changed"] as const;
+const EVENT_TYPES = ["operator.added", "operator.updated", "operator.removed", "watcher.status", "pipelines.changed"] as const;
 
 /** Server-Sent Events from /api/events. `onHello` fires on every (re)connect so callers can resync. */
 export function subscribe(onEvent: (e: ServerEvent) => void, onHello: () => void, onDown: () => void): () => void {

@@ -1,4 +1,4 @@
-// Live data stages: what each node reads and writes, and pairing a processor's input
+// Live data stages: what each node reads and writes, and pairing an operator's input
 // records with its output records. Feeds are keyed by dataset (topic) name.
 
 import { datasetName, isDatasetNode, type FeedMessage, type FeedState, type GraphEdge, type GraphNode } from "../types";
@@ -114,10 +114,10 @@ export interface Pair {
 }
 
 /**
- * Pair input and output records by id. An input counts as dropped by the processor when the
+ * Pair input and output records by id. An input counts as dropped by the operator when the
  * output has moved on well past it (by `dropAfterMs`, or twice the slowest pairing seen, so
- * windowed processors like a join aren't blamed for holding records) without it. History from
- * before the output's oldest record in view, or a stalled processor, isn't a drop; outputs
+ * windowed operators like a join aren't blamed for holding records) without it. History from
+ * before the output's oldest record in view, or a stalled operator, isn't a drop; outputs
  * whose input isn't in view are "out-only".
  */
 export function pairRecords(inputs: FeedMessage[], outputs: FeedMessage[], now: number, dropAfterMs = 5000): Pair[] {

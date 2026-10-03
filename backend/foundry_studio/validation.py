@@ -1,7 +1,7 @@
 """Validation passthrough: every rule and every message comes from foundry-platform/foundry-ci.
 
 The graph is written to a manifest exactly as Save would write it and handed to the pipelines CI's
-validators: pipeline/validate/typecheck.py's check() (with each processor's operator.yaml at
+validators: pipeline/validate/typecheck.py's check() (with each operator's operator.yaml at
 its Ref, as discovered, and the types in schema-registry) and cycles.py, plus
 shared/pipeline.py's load_profile() for every Kafka's Config, against the config-registry's profiles
 staged in a temporary checkout. Errors are only *located* here (attached to the node or edge they
@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from .discovery import ProcessorInfo
+from .discovery import OperatorInfo
 from .foundry import Foundry, dataset_node, locate
 from .manifest import graph_to_manifest, wiring
 from .sources import Sources
@@ -28,8 +28,8 @@ def _norm_repo(repo: str | None) -> str:
     return re.sub(r"^https?://[^/]+/", "", (repo or "").strip().lower()).removesuffix("/").removesuffix(".git")
 
 
-def find_info(spec: dict | None, infos: Iterable[ProcessorInfo]) -> ProcessorInfo | None:
-    """The discovered processor a manifest entry runs (same repo and folder)."""
+def find_info(spec: dict | None, infos: Iterable[OperatorInfo]) -> OperatorInfo | None:
+    """The discovered operator a manifest entry runs (same repo and folder)."""
     spec = spec or {}
     repo, path = _norm_repo(spec.get("Repo")), str(spec.get("Path") or "").strip("/")
     return next((i for i in infos if _norm_repo(i.repo) == repo and i.path == path), None)
@@ -40,14 +40,14 @@ def _types(label: str | None) -> list[str]:
     return [t for t in (label or "").split(" | ") if t]
 
 
-def declarations(graph: dict, infos: Iterable[ProcessorInfo]) -> dict[str, dict]:
-    """Each processor's operator.yaml (in, out, Runtime) at its Ref (no Ref: the default branch)."""
+def declarations(graph: dict, infos: Iterable[OperatorInfo]) -> dict[str, dict]:
+    """Each operator's operator.yaml (in, out, Runtime) at its Ref (no Ref: the default branch)."""
     infos = list(infos)
     out = {}
     for n in graph.get("nodes", []):
-        if n.get("kind") != "processor":
+        if n.get("kind") != "operator":
             continue
-        spec = n.get("processor") or {}
+        spec = n.get("operator") or {}
         info = find_info(spec, infos)
         if not info:
             continue
@@ -90,8 +90,8 @@ class Validator:
         manifest_text = graph_to_manifest(graph)
         manifest = yaml.safe_load(manifest_text) or {}
         kafkas = set(self.foundry.pipeline.section(manifest, "Kafkas"))
-        processors = set(self.foundry.pipeline.section(manifest, "Processors"))
-        issues = [locate(m, kafkas, processors) for m in self._messages(manifest, configs, types, decls)]
+        operators = set(self.foundry.pipeline.section(manifest, "Operators"))
+        issues = [locate(m, kafkas, operators) for m in self._messages(manifest, configs, types, decls)]
         if configs_error:
             issues.insert(0, {"message": f"ConfigRegistry: can't read the connection profiles: {configs_error}",
                               "node": None, "edge": None, "nodes": [], "field": "ConfigRegistry"})
@@ -99,32 +99,32 @@ class Validator:
         written = {d for w in wired.values() for d in w["Outputs"]}
         read = {d for w in wired.values() for d in w["Inputs"]}
         return {"ok": not issues, "errors": issues, "manifest": manifest_text,
-                "summary": f"{len(processors)} processors, {len(kafkas)} Kafkas",
+                "summary": f"{len(operators)} operators, {len(kafkas)} Kafkas",
                 "sources": sorted(d for d in kafkas if d in read and d not in written),
                 "sinks": sorted(d for d in kafkas if d in written and d not in read)}
 
     def check_edge(self, graph: dict, source: str, target: str, configs: dict | None, types: list[str] | None,
                    decls: dict) -> dict:
         """Would adding source -> target be accepted? The validators decide; we only add the canvas rules
-        that come from the manifest's shape (a processor writes one Kafka; a dotnet one reads one)."""
+        that come from the manifest's shape (an operator writes one Kafka; a dotnet one reads one)."""
         nodes = {n["id"]: n for n in graph.get("nodes", [])}
         s, t = nodes.get(source), nodes.get(target)
         if not s or not t:
             return {"ok": False, "message": "unknown node"}
         kinds = (s.get("kind"), t.get("kind"))
-        if kinds == ("processor", "processor"):
-            return {"ok": False, "message": f"{source} -> {target}: processors connect through a Kafka; "
+        if kinds == ("operator", "operator"):
+            return {"ok": False, "message": f"{source} -> {target}: operators connect through a Kafka; "
                                             "drop a Kafka between them"}
         if kinds == ("dataset", "dataset"):
-            return {"ok": False, "message": "Kafkas connect through a processor"}
+            return {"ok": False, "message": "Kafkas connect through an operator"}
         w = wiring(graph)
-        if kinds == ("dataset", "processor") and w[target]["Inputs"] \
+        if kinds == ("dataset", "operator") and w[target]["Inputs"] \
                 and (decls.get(target) or {}).get("Runtime", "dotnet") != "flink":
             return {"ok": False, "message": f"{target}: already reads {w[target]['Inputs'][0]}; "
-                                            "a dotnet processor reads one Kafka"}
-        if kinds == ("processor", "dataset") and w[source]["Outputs"]:
+                                            "a dotnet operator reads one Kafka"}
+        if kinds == ("operator", "dataset") and w[source]["Outputs"]:
             return {"ok": False, "message": f"{source}: already writes {w[source]['Outputs'][0]}; "
-                                            "a processor writes one Kafka"}
+                                            "an operator writes one Kafka"}
 
         edge = [source, target]
         before = {e["message"] for e in self.validate(graph, configs, types, decls)["errors"]}
@@ -137,7 +137,7 @@ class Validator:
         return {"ok": True, "message": None}
 
     def endpoint(self, graph: dict, node: str, configs: dict | None) -> dict:
-        """The Kafka a node is (or, for a processor, writes), and how to connect to it."""
+        """The Kafka a node is (or, for an operator, writes), and how to connect to it."""
         nodes = {n["id"]: n for n in graph.get("nodes", [])}
         if node not in nodes:
             raise ValueError(f"unknown node {node!r}")

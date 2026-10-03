@@ -3,7 +3,7 @@ import type { FeedMessage, GraphNode } from "../types";
 import type { FeedState } from "../types";
 import { diffRecords, edgeDataset, liveKeys, pairRecords, recordId, stageFeeds, stageStats, stages, type GraphLike } from "./stages";
 
-const t = (id: string): GraphNode => ({ id, kind: "processor", processor: {} });
+const t = (id: string): GraphNode => ({ id, kind: "operator", operator: {} });
 const d = (name: string): GraphNode => ({ id: `dataset:${name}`, kind: "dataset", dataset: name });
 const graph: GraphLike = {
   nodes: [d("packets.decoded"), t("Base64Decoder"), d("raw.xml"), t("XmlToJson"), d("encoded")],
@@ -30,7 +30,7 @@ const msg = (value: string, secondsAgo: number, key: string | null = null): Feed
 });
 
 describe("stages", () => {
-  it("orders datasets and processors along the pipeline", () => {
+  it("orders datasets and operators along the pipeline", () => {
     expect(stages(graph)).toEqual([
       "dataset:raw.xml", "XmlToJson", "dataset:encoded", "Base64Decoder", "dataset:packets.decoded",
     ]);
@@ -62,7 +62,7 @@ describe("pairing", () => {
     expect(pairs[0].id).toBe("a"); // newest first
     // Inputs from before the output's oldest record in view aren't judged.
     expect(pairRecords([msg('{"guid":"b"}', 9)], [msg('{"guid":"z"}', 4)], NOW)[1].status).toBe("pending");
-    // A windowed processor (outputs ~11 s after their inputs) isn't blamed for records still in a window.
+    // A windowed operator (outputs ~11 s after their inputs) isn't blamed for records still in a window.
     const windowed = pairRecords(
       [msg('{"guid":"a"}', 30), msg('{"guid":"b"}', 12)],
       [msg('{"guid":"a"}', 19), msg('{"guid":"y"}', 1), msg('{"guid":"x"}', 25)],
@@ -73,7 +73,7 @@ describe("pairing", () => {
 });
 
 describe("diffRecords", () => {
-  it("shows what a processor changed", () => {
+  it("shows what an operator changed", () => {
     const d = diffRecords(
       "<packet><guid>g</guid><data>SGVsbG8=</data></packet>",
       '{"guid":"g","data":"Hello","extra":1}',
@@ -92,7 +92,7 @@ describe("live overview", () => {
     expect(liveKeys(graph)).toEqual(["raw.xml", "encoded", "packets.decoded"]);
   });
 
-  it("summarises a processor's throughput and drops", () => {
+  it("summarises an operator's throughput and drops", () => {
     const feeds = {
       encoded: feed([msg('{"guid":"a"}', 2), msg('{"guid":"b"}', 20), msg('{"guid":"c"}', 30)]),
       "packets.decoded": feed([msg('{"guid":"a"}', 1), msg('{"guid":"c"}', 29)]),
@@ -102,7 +102,7 @@ describe("live overview", () => {
     expect(stageStats(graph, "dataset:packets.decoded", feeds, NOW)).toMatchObject({ inRate: 2, tone: "success" });
   });
 
-  it("flags a processor that receives but produces nothing", () => {
+  it("flags an operator that receives but produces nothing", () => {
     const feeds = { encoded: feed([msg('{"guid":"a"}', 2)]), "packets.decoded": feed([]) };
     expect(stageStats(graph, "Base64Decoder", feeds, NOW).tone).toBe("danger");
     expect(stageStats(graph, "Base64Decoder", {}, NOW).label).toBe("Off");

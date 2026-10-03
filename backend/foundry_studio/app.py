@@ -42,7 +42,7 @@ class SaveBody(BaseModel):
 
 class PeekBody(BaseModel):
     graph: dict
-    node: str  # a Kafka node, or a processor (the Kafka it writes)
+    node: str  # a Kafka node, or an operator (the Kafka it writes)
 
 
 class EdgeBody(BaseModel):
@@ -66,9 +66,9 @@ class Services:
                                settings.schema_registry_repo)
         self.discovery = Discovery(gitlab, lambda: self.sources.type_names)
         self.peeks = asyncio.Semaphore(8)  # concurrent live feeds
-        self.watcher = Watcher(gitlab, self.discovery, self.bus, settings.processor_projects,
+        self.watcher = Watcher(gitlab, self.discovery, self.bus, settings.operator_projects,
                                settings.poll_interval, settings.full_rescan_interval,
-                               pipelines=PipelineSync(self.workspace, settings.pipelines_repo,
+                               pipelines=PipelineSync(self.workspace, self.sources.url_of(settings.pipelines_repo),
                                                       self.sources.project_of(settings.pipelines_repo))
                                if settings.pipelines_repo else None)
 
@@ -76,7 +76,7 @@ class Services:
         """What validating a graph needs besides the graph: profiles, schema-registry types, operator.yaml files."""
         configs = graph.get("configs") or {}
         ctx: dict = {"configs": None, "configs_error": None, "types": None,
-                     "decls": declarations(graph, self.watcher.processors.values())}
+                     "decls": declarations(graph, self.watcher.operators.values())}
         try:
             ctx["configs"] = await self.sources.configs(configs.get("Repo"), configs.get("Ref"))
         except SourceError as e:
@@ -177,7 +177,7 @@ def create_app(services: Services | None = None, start_watcher: bool = True) -> 
             "workspace": str(s.workspace),
             "configsRepo": s.settings.configs_repo,
             "schemaRegistryRepo": s.settings.schema_registry_repo,
-            "processorProjects": s.watcher.projects_with_processors,
+            "operatorProjects": s.watcher.projects_with_operators,
             "watcher": s.watcher.status(),
         }
 
@@ -197,15 +197,15 @@ def create_app(services: Services | None = None, start_watcher: bool = True) -> 
             out["errors"]["types"] = str(e)
         return out
 
-    @app.get("/api/processors")
-    async def processors(request: Request):
+    @app.get("/api/operators")
+    async def operators(request: Request):
         s = svc(request)
         try:
             await asyncio.wait_for(s.watcher.ready.wait(), timeout=30)
         except asyncio.TimeoutError:
             pass
         return {
-            "processors": [t.to_json() for t in sorted(s.watcher.processors.values(), key=lambda t: t.id)],
+            "operators": [t.to_json() for t in sorted(s.watcher.operators.values(), key=lambda t: t.id)],
             "status": s.watcher.status(),
         }
 
@@ -257,7 +257,7 @@ def create_app(services: Services | None = None, start_watcher: bool = True) -> 
     async def peek(body: PeekBody, request: Request):
         """Server-Sent Events: a read-only live feed of a Kafka (see peek.py).
 
-        node is a Kafka node, or a processor (the Kafka it writes)."""
+        node is a Kafka node, or an operator (the Kafka it writes)."""
         s = svc(request)
         ctx = await s.context(body.graph)
         try:

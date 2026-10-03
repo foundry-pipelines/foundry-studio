@@ -27,16 +27,16 @@ def dataset_node(name: str) -> str:
 _EDGE_RE = re.compile(r"^Flow: (\S+) -> (\S+):")
 _CYCLE_RE = re.compile(r"^Flow has a cycle: (.+)$")
 _KAFKA_RE = re.compile(r"^Kafkas\.([^.:\s]+)(?:\.(Config|AllowedTypes|Topic|ConnectionSettings))?: ")
-_PROCESSOR_RE = re.compile(r"^Processors\.([^.:\s]+)(?:\.([A-Za-z]+))?:")
+_OPERATOR_RE = re.compile(r"^Operators\.([^.:\s]+)(?:\.([A-Za-z]+))?:")
 _NAME_RE = re.compile(r"^([^\s:.]+): ")
 
 
-def locate(message: str, kafkas: set[str] = frozenset(), processors: set[str] = frozenset()) -> dict:
+def locate(message: str, kafkas: set[str] = frozenset(), operators: set[str] = frozenset()) -> dict:
     """What a validator error is about: {message, node, edge, nodes, field}."""
     issue: dict = {"message": message, "node": None, "edge": None, "nodes": [], "field": None}
 
     def node(name: str) -> str:
-        return dataset_node(name) if name in kafkas and name not in processors else name
+        return dataset_node(name) if name in kafkas and name not in operators else name
 
     if m := _EDGE_RE.match(message):
         a, b = node(m.group(1)), node(m.group(2))
@@ -48,12 +48,12 @@ def locate(message: str, kafkas: set[str] = frozenset(), processors: set[str] = 
     elif m := _KAFKA_RE.match(message):
         issue["node"] = dataset_node(m.group(1))
         issue["field"] = m.group(2)
-    elif m := _PROCESSOR_RE.match(message):
+    elif m := _OPERATOR_RE.match(message):
         issue["node"] = m.group(1)
         issue["field"] = m.group(2)
     elif message.startswith(("Name", "ConfigRegistry", "Flow")):
         issue["field"] = message.split(":", 1)[0].split(".")[0].split("[")[0]
-    elif (m := _NAME_RE.match(message)) and (m.group(1) in kafkas or m.group(1) in processors):
+    elif (m := _NAME_RE.match(message)) and (m.group(1) in kafkas or m.group(1) in operators):
         issue["node"] = node(m.group(1))
     if issue["node"] and not issue["nodes"]:
         issue["nodes"] = [issue["node"]]

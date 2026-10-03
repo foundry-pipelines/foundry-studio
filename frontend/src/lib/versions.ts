@@ -1,4 +1,4 @@
-import type { ProcessorInfo, Processorspec, Version } from "../types";
+import type { OperatorInfo, Operatorspec, Version } from "../types";
 
 const SEMVER = /v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/;
 
@@ -27,8 +27,8 @@ const normRepo = (repo: string | undefined) =>
     .replace(/\.git$/, "")
     .replace(/\/$/, "");
 
-/** The discovered processor a canvas node was dragged from (same repo and folder). */
-export function findInfo(spec: Processorspec | undefined, infos: Iterable<ProcessorInfo>): ProcessorInfo | undefined {
+/** The discovered operator a canvas node was dragged from (same repo and folder). */
+export function findInfo(spec: Operatorspec | undefined, infos: Iterable<OperatorInfo>): OperatorInfo | undefined {
   if (!spec) return undefined;
   const repo = normRepo(spec.Repo);
   const path = (spec.Path ?? "").replace(/^\/+|\/+$/g, "");
@@ -38,17 +38,17 @@ export function findInfo(spec: Processorspec | undefined, infos: Iterable<Proces
   return undefined;
 }
 
-/** The default-branch version: what a processor without a Ref, or with Ref: <default branch>, runs. */
-export function headVersion(info: ProcessorInfo | undefined): Version | undefined {
+/** The default-branch version: what an operator without a Ref, or with Ref: <default branch>, runs. */
+export function headVersion(info: OperatorInfo | undefined): Version | undefined {
   return info?.versions.find((v) => v.kind === "branch");
 }
 
 /** Whether ref follows the default branch: none, HEAD, or the branch's name (e.g. main). */
-export function followsBranch(info: ProcessorInfo | undefined, ref: string | undefined): boolean {
+export function followsBranch(info: OperatorInfo | undefined, ref: string | undefined): boolean {
   return !ref || ref === "HEAD" || ref === headVersion(info)?.label.split("@")[0];
 }
 
-export function versionFor(info: ProcessorInfo | undefined, ref: string | undefined): Version | undefined {
+export function versionFor(info: OperatorInfo | undefined, ref: string | undefined): Version | undefined {
   if (!info) return undefined;
   if (!ref || followsBranch(info, ref)) return headVersion(info);
   return info.versions.find((v) => v.ref === ref) ?? info.versions.find((v) => v.commit.startsWith(ref));
@@ -59,7 +59,7 @@ export function versionFor(info: ProcessorInfo | undefined, ref: string | undefi
  * semver tag exists; a pinned commit is outdated when the newest version is a
  * different commit.
  */
-export function updateFor(info: ProcessorInfo | undefined, ref: string | undefined): Version | undefined {
+export function updateFor(info: OperatorInfo | undefined, ref: string | undefined): Version | undefined {
   // Following the default branch is always on the latest.
   if (!info || !ref || followsBranch(info, ref) || info.versions.length === 0) return undefined;
   const newest = info.versions[0];

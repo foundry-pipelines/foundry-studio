@@ -16,7 +16,7 @@ import {
   type Health,
   type Layout,
   type PipelineListing,
-  type ProcessorInfo,
+  type OperatorInfo,
   type ValidationResult,
   type WatcherStatus,
 } from "./types";
@@ -25,7 +25,7 @@ const FEED_KEEP = 200; // messages kept per feed; rates count every message (Fee
 const idleFeed = (): FeedState => ({ state: "idle", messages: [], count: 0 });
 
 export type PipelineNodeData = { spec: GraphNode };
-export type PNode = Node<PipelineNodeData, "processor" | "dataset">;
+export type PNode = Node<PipelineNodeData, "operator" | "dataset">;
 /** A connection in the store; on the canvas, one of its wires (data: the schema drawn and the connection's id). */
 export type PEdge = Edge<{ schema?: string; connection?: string }, "topic">;
 
@@ -74,7 +74,7 @@ interface State {
 
   catalog: Catalog | null;
 
-  processors: Record<string, ProcessorInfo>;
+  operators: Record<string, OperatorInfo>;
   changed: Record<string, { kind: "added" | "updated"; at: number }>;
   watcher: WatcherStatus | null;
   health: Health | null;
@@ -82,7 +82,7 @@ interface State {
   live: boolean;
 
   toasts: Toast[];
-  bottomTab: "processors" | "datasets" | "live";
+  bottomTab: "operators" | "datasets" | "live";
   feedsOn: boolean;
   liveStage: string | null; // the node whose data Live data shows
   feeds: Record<string, FeedState>; // by dataset name
@@ -99,7 +99,7 @@ interface State {
   onNodesChange: (changes: NodeChange<PNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<PEdge>[]) => void;
   connect: (source: string, target: string) => void;
-  addProcessor: (info: ProcessorInfo, ref: string, position: { x: number; y: number }) => string;
+  addOperator: (info: OperatorInfo, ref: string, position: { x: number; y: number }) => string;
   addDataset: (name: string, spec: DatasetSpec, position: { x: number; y: number }) => string;
   updateSpec: (id: string, update: (spec: GraphNode) => GraphNode) => void;
   renameNode: (from: string, to: string) => string | null;
@@ -108,9 +108,9 @@ interface State {
   setFocus: (focus: State["focus"]) => void;
   markSaved: (origin: Origin) => void;
 
-  setProcessors: (list: ProcessorInfo[]) => void;
-  upsertProcessor: (info: ProcessorInfo, kind: "added" | "updated") => void;
-  removeProcessor: (id: string) => void;
+  setOperators: (list: OperatorInfo[]) => void;
+  upsertOperator: (info: OperatorInfo, kind: "added" | "updated") => void;
+  removeOperator: (id: string) => void;
 
   feedStatus: (key: string, status: Partial<FeedState>) => void;
   feedMessage: (key: string, message: FeedMessage) => void;
@@ -134,7 +134,7 @@ export const useStudio = create<State>()((set, get) => ({
 
   catalog: null,
 
-  processors: {},
+  operators: {},
   changed: {},
   watcher: null,
   health: null,
@@ -142,7 +142,7 @@ export const useStudio = create<State>()((set, get) => ({
   live: false,
 
   toasts: [],
-  bottomTab: "processors",
+  bottomTab: "operators",
   feedsOn: false,
   liveStage: null,
   feeds: {},
@@ -235,16 +235,16 @@ export const useStudio = create<State>()((set, get) => ({
         : { edges: [...s.edges, toPEdge(source, target)], revision: s.revision + 1, dirty: true },
     ),
 
-  addProcessor: (info, ref, position) => {
+  addOperator: (info, ref, position) => {
     const taken = new Set(get().nodes.map((n) => n.id));
-    let id = info.name.replace(/[^A-Za-z0-9._-]/g, "") || "Processor";
+    let id = info.name.replace(/[^A-Za-z0-9._-]/g, "") || "Operator";
     for (let i = 2; taken.has(id); i++) id = `${info.name}${i}`;
-    // Without a version asked for, Ref is the default branch: the processor follows it.
+    // Without a version asked for, Ref is the default branch: the operator follows it.
     const branch = headVersion(info)?.label.split("@")[0];
     const spec: GraphNode = {
       id,
-      kind: "processor",
-      processor: { Repo: info.repo, ...(info.path ? { Path: info.path } : {}), ...(ref || branch ? { Ref: ref || branch } : {}) },
+      kind: "operator",
+      operator: { Repo: info.repo, ...(info.path ? { Path: info.path } : {}), ...(ref || branch ? { Ref: ref || branch } : {}) },
     };
     set((s) => ({
       nodes: [...s.nodes.map((n) => ({ ...n, selected: false })), { ...toPNode(spec, position), selected: true }],
@@ -279,7 +279,7 @@ export const useStudio = create<State>()((set, get) => ({
 
   renameNode: (from, toName) => {
     const s = get();
-    // A dataset's id is dataset:<its name>; a processor's id is its name.
+    // A dataset's id is dataset:<its name>; an operator's id is its name.
     const dataset = isDatasetNode(from);
     const to = dataset ? datasetNode(toName) : toName;
     if (from === to) return null;
@@ -314,19 +314,19 @@ export const useStudio = create<State>()((set, get) => ({
 
   markSaved: (origin) => set({ dirty: false, origin }),
 
-  setProcessors: (list) => set({ processors: Object.fromEntries(list.map((t) => [t.id, t])) }),
+  setOperators: (list) => set({ operators: Object.fromEntries(list.map((t) => [t.id, t])) }),
 
-  upsertProcessor: (info, kind) =>
+  upsertOperator: (info, kind) =>
     set((s) => ({
-      processors: { ...s.processors, [info.id]: info },
+      operators: { ...s.operators, [info.id]: info },
       changed: { ...s.changed, [info.id]: { kind, at: Date.now() } },
     })),
 
-  removeProcessor: (id) =>
+  removeOperator: (id) =>
     set((s) => {
-      const processors = { ...s.processors };
-      delete processors[id];
-      return { processors };
+      const operators = { ...s.operators };
+      delete operators[id];
+      return { operators };
     }),
 
   feedStatus: (key, status) =>

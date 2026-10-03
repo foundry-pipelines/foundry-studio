@@ -19,7 +19,7 @@ function usePortState(nodeId: string, port: "in" | "out"): PortState {
   if (fromType === "target" && port === "in") return "idle";
   const s = useStudio.getState();
   const [a, b] = fromType === "source" ? [from, nodeId] : [nodeId, from];
-  return checkConnection(s.graph(), s.processors, a, b).ok ? "compatible" : "incompatible";
+  return checkConnection(s.graph(), s.operators, a, b).ok ? "compatible" : "incompatible";
 }
 
 const SOCKET_MIME = "application/x-foundry-socket";
@@ -84,37 +84,37 @@ function Port({ nodeId, port, schema, label = true, handle = port, testId = `por
   );
 }
 
-function ProcessorNodeView({ id, data, selected }: NodeProps<PNode>) {
+function OperatorNodeView({ id, data, selected }: NodeProps<PNode>) {
   const spec = data.spec;
   const validation = useStudio((s) => s.validation);
   const focus = useStudio((s) => s.focus);
-  const processors = useStudio((s) => s.processors);
+  const operators = useStudio((s) => s.operators);
   const errors = issuesFor(validation, id);
   const focused = focus?.nodes.includes(id);
 
-  const info = findInfo(spec.processor, Object.values(processors));
-  const version = versionFor(info, spec.processor?.Ref);
-  const update = updateFor(info, spec.processor?.Ref);
-  const subtitle = spec.processor?.Ref ? version?.label ?? spec.processor.Ref : "latest (default branch)";
+  const info = findInfo(spec.operator, Object.values(operators));
+  const version = versionFor(info, spec.operator?.Ref);
+  const update = updateFor(info, spec.operator?.Ref);
+  const subtitle = spec.operator?.Ref ? version?.label ?? spec.operator.Ref : "latest (default branch)";
   const socketOrder = useStudio((s) => s.socketOrder[id]);
-  const ins = ordered(inputSockets(spec, processors), socketOrder);
+  const ins = ordered(inputSockets(spec, operators), socketOrder);
   useRemeasure(id, ins);
 
   return (
     <div
-      className={`pnode pnode-processor${selected ? " selected" : ""}${errors.length ? " has-error" : ""}${focused ? " focused" : ""}`}
+      className={`pnode pnode-operator${selected ? " selected" : ""}${errors.length ? " has-error" : ""}${focused ? " focused" : ""}`}
       data-testid={`node-${id}`}
       title={errors.map((e) => e.message).join("\n") || undefined}
     >
       <div className="pnode-head">
-        <span className="pnode-kind">⚙ Processor</span>
+        <span className="pnode-kind">⚙ Operator</span>
         {info && info.warnings.length > 0 && (
           <span className="badge badge-warn" title={info.warnings.join("\n")}>
             ⚠
           </span>
         )}
         {!info && (
-          <span className="badge badge-muted" title="Not found among discovered processors">
+          <span className="badge badge-muted" title="Not found among discovered operators">
             ?
           </span>
         )}
@@ -144,16 +144,16 @@ function ProcessorNodeView({ id, data, selected }: NodeProps<PNode>) {
             ))}
           </div>
         ) : (
-          <Port nodeId={id} port="in" schema={expects(spec, processors)} />
+          <Port nodeId={id} port="in" schema={expects(spec, operators)} />
         )}
-        <Port nodeId={id} port="out" schema={emits(spec, processors)} />
+        <Port nodeId={id} port="out" schema={emits(spec, operators)} />
       </div>
       {errors.length > 0 && <div className="pnode-errors">{errors.length} issue{errors.length > 1 ? "s" : ""}</div>}
     </div>
   );
 }
 
-/** One of the pipeline's Kafkas (a topic): processors write into its left side and read from its right. */
+/** One of the pipeline's Kafkas (a topic): operators write into its left side and read from its right. */
 function DatasetNodeView({ id, data, selected }: NodeProps<PNode>) {
   const name = data.spec.dataset ?? id;
   const validation = useStudio((s) => s.validation);
@@ -216,5 +216,5 @@ function DatasetNodeView({ id, data, selected }: NodeProps<PNode>) {
   );
 }
 
-export const ProcessorNode = memo(ProcessorNodeView);
+export const OperatorNode = memo(OperatorNodeView);
 export const DatasetNode = memo(DatasetNodeView);

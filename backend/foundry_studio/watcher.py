@@ -2,16 +2,16 @@
 
 Which projects: every project the token's user is a member of (re-listed every
 `discovery_interval` seconds, so new projects show up on their own), or a fixed list
-(STUDIO_PROCESSOR_PROJECTS). Any folder with an operator.yaml in any of them is a
-processor. The pipelines repo (one folder per pipeline) is watched too, and the workspace,
+(STUDIO_OPERATOR_PROJECTS). Any folder with an operator.yaml in any of them is a
+operator. The pipelines repo (one folder per pipeline) is watched too, and the workspace,
 a checkout of it, follows its pushes (PipelineSync).
 
 Polling (every `poll_interval` seconds) reads each project's events API, plus
 `last_activity_at` (which GitLab only refreshes about once an hour, so it's a backstop,
-not the signal). A push or tag event on a processor project triggers a rescan; the
+not the signal). A push or tag event on an operator project triggers a rescan; the
 rescan is diffed against the previous one and the differences go to the browser:
 
-    processor.added / processor.updated (newVersions) / processor.removed
+    operator.added / operator.updated (newVersions) / operator.removed
     watcher.status    mode, last poll, last error
 """
 
@@ -21,7 +21,7 @@ import asyncio
 import logging
 import time
 
-from .discovery import Discovery, ProcessorInfo
+from .discovery import Discovery, OperatorInfo
 from .gitlab import GitLab
 from .pipelines import PipelineSync
 
@@ -53,7 +53,7 @@ class EventBus:
 
 
 class Watcher:
-    def __init__(self, gitlab: GitLab, discovery: Discovery, bus: EventBus, processor_projects: list[str] | None,
+    def __init__(self, gitlab: GitLab, discovery: Discovery, bus: EventBus, operator_projects: list[str] | None,
                  poll_interval: float = 10.0, full_rescan_interval: float = 300.0, discovery_interval: float = 60.0,
                  pipelines: PipelineSync | None = None):
         self.gitlab = gitlab
@@ -61,10 +61,10 @@ class Watcher:
         self.discovery = discovery
         self.bus = bus
         # None: every project the user is a member of.
-        self.fixed_projects = list(processor_projects) if processor_projects else None
+        self.fixed_projects = list(operator_projects) if operator_projects else None
         if self.fixed_projects is not None and pipelines and pipelines.project not in self.fixed_projects:
             self.fixed_projects.append(pipelines.project)
-        self.processor_projects = list(self.fixed_projects or [])
+        self.operator_projects = list(self.fixed_projects or [])
         self.poll_interval = poll_interval
         self.full_rescan_interval = full_rescan_interval
         self.discovery_interval = discovery_interval
@@ -72,7 +72,7 @@ class Watcher:
         self._gate = asyncio.Semaphore(6)  # projects scanned at once
         self._listed_activity: dict[str, str] = {}
 
-        self.processors: dict[str, ProcessorInfo] = {}
+        self.operators: dict[str, OperatorInfo] = {}
         self.errors: dict[str, str] = {}
         self.last_poll: float | None = None
         self.last_webhook: float | None = None
@@ -109,13 +109,13 @@ class Watcher:
     async def initial_scan(self) -> None:
         if self.fixed_projects is None:
             await self.refresh_projects(scan=False)
-        await asyncio.gather(*(self._guard(p, self._prime(p), rescan=True) for p in self.processor_projects))
+        await asyncio.gather(*(self._guard(p, self._prime(p), rescan=True) for p in self.operator_projects))
         self.ready.set()
         self._status()
 
     @property
-    def projects_with_processors(self) -> list[str]:
-        return sorted({t.project for t in self.processors.values()})
+    def projects_with_operators(self) -> list[str]:
+        return sorted({t.project for t in self.operators.values()})
 
     async def refresh_projects(self, scan: bool = True) -> None:
         """Every member project: scan new ones, rescan ones with new activity, forget deleted ones."""
@@ -130,11 +130,11 @@ class Watcher:
         activity = {p["path_with_namespace"]: p.get("last_activity_at") or "" for p in listed}
         if self.pipelines:
             activity.setdefault(self.pipelines.project, "")
-        new = [p for p in activity if p not in self.processor_projects]
-        changed = [p for p in activity if p in self.processor_projects
+        new = [p for p in activity if p not in self.operator_projects]
+        changed = [p for p in activity if p in self.operator_projects
                    and activity[p] != self._listed_activity.get(p)]
-        gone = [p for p in self.processor_projects if p not in activity]
-        self.processor_projects = sorted(activity)
+        gone = [p for p in self.operator_projects if p not in activity]
+        self.operator_projects = sorted(activity)
         self._listed_activity = activity
         for project in gone:
             self._forget(project)
@@ -143,9 +143,9 @@ class Watcher:
                                  *(self._guard(p, self.rescan(p), rescan=False) for p in changed))
 
     def _forget(self, project: str) -> None:
-        for tid in [k for k, v in self.processors.items() if v.project == project]:
-            gone = self.processors.pop(tid)
-            self.bus.publish({"type": "processor.removed", "id": tid, "name": gone.name})
+        for tid in [k for k, v in self.operators.items() if v.project == project]:
+            gone = self.operators.pop(tid)
+            self.bus.publish({"type": "operator.removed", "id": tid, "name": gone.name})
         for d in (self._last_event, self._last_activity, self._last_full, self.errors):
             d.pop(project, None)
 
@@ -178,9 +178,9 @@ class Watcher:
             "lastPoll": self.last_poll,
             "lastWebhook": self.last_webhook,
             "errors": {**self.errors, **(self.pipelines.errors if self.pipelines else {})},
-            "projects": self.processor_projects,
+            "projects": self.operator_projects,
             "scope": "fixed" if self.fixed_projects is not None else "membership",
-            "withProcessors": self.projects_with_processors,
+            "withOperators": self.projects_with_operators,
             "ready": self.ready.is_set(),
         }
 
@@ -204,13 +204,13 @@ class Watcher:
         auto = self.fixed_projects is None
         if auto and (self._last_listing is None or time.monotonic() - self._last_listing >= self.discovery_interval):
             await self.refresh_projects()
-        with_processors = set(self.projects_with_processors) | ({self.pipelines.project} if self.pipelines else set())
-        for project in self.processor_projects:
+        with_operators = set(self.projects_with_operators) | ({self.pipelines.project} if self.pipelines else set())
+        for project in self.operator_projects:
             async def check(project=project):
                 stale = time.monotonic() - self._last_full.get(project, 0) > self.full_rescan_interval
-                # With every member project watched, only those with processors or a pipeline are polled for
+                # With every member project watched, only those with operators or a pipeline are polled for
                 # pushes; the others are caught by the project listing's activity and the periodic rescan.
-                if auto and project not in with_processors:
+                if auto and project not in with_operators:
                     if stale:
                         await self.rescan(project)
                     return
@@ -228,7 +228,7 @@ class Watcher:
         self.last_webhook = time.time()
         project = ((payload.get("project") or {}).get("path_with_namespace")
                    or payload.get("project_path_with_namespace") or "")
-        known = next((p for p in self.processor_projects if p.lower() == project.lower()), None)
+        known = next((p for p in self.operator_projects if p.lower() == project.lower()), None)
         if kind in ("Push Hook", "Tag Push Hook") and project:
             if known:
                 await self._guard(known, self.rescan(known), rescan=False)
@@ -244,20 +244,20 @@ class Watcher:
         async with lock, self._gate:
             found = await self.discovery.scan_project(project)
             self._last_full[project] = time.monotonic()
-            old = {k: v for k, v in self.processors.items() if v.project == project}
+            old = {k: v for k, v in self.operators.items() if v.project == project}
             for tid, info in found.items():
                 prev = old.get(tid)
                 if prev is None:
-                    self.bus.publish({"type": "processor.added", "processor": info.to_json()})
+                    self.bus.publish({"type": "operator.added", "operator": info.to_json()})
                 elif info.to_json() != prev.to_json():
                     before = {v.ref for v in prev.versions}
                     self.bus.publish({
-                        "type": "processor.updated", "processor": info.to_json(),
+                        "type": "operator.updated", "operator": info.to_json(),
                         "newVersions": [v.ref for v in info.versions if v.ref not in before and v.kind == "tag"],
                     })
-                self.processors[tid] = info
+                self.operators[tid] = info
             for tid in old.keys() - found.keys():
-                gone = self.processors.pop(tid)
-                self.bus.publish({"type": "processor.removed", "id": tid, "name": gone.name})
+                gone = self.operators.pop(tid)
+                self.bus.publish({"type": "operator.removed", "id": tid, "name": gone.name})
         if self.pipelines and project == self.pipelines.project and await self.pipelines.sync():
             self.bus.publish({"type": "pipelines.changed", "project": project})

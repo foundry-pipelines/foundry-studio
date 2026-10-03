@@ -49,6 +49,10 @@ class Sources:
             raise SourceError(f"{repo} isn't on {self.gitlab_url}")
         return url[len(base) + 1:]
 
+    def url_of(self, repo: str) -> str:
+        """A Repo's clone URL: a URL as it is, or a project path on this GitLab."""
+        return repo if "://" in repo else f"{self.gitlab_url}/{repo}.git"
+
     async def _cached(self, key: tuple, load) -> dict:
         hit = self._cache.get(key)
         if hit and time.monotonic() - hit[0] < self.ttl:

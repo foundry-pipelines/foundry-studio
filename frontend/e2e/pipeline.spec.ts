@@ -34,7 +34,7 @@ test("PacketPipeline draws Input -> XmlToJson -> ConvertedPackets -> Decode, Isp
   await expect(page.getByTestId("validation-status")).toContainText("validators: valid");
 });
 
-test("wiring a Kafka of the wrong type is refused with the validators' message; one input per dotnet processor", async ({ page }) => {
+test("wiring a Kafka of the wrong type is refused with the validators' message; one input per dotnet operator", async ({ page }) => {
   await page.goto("/?new=1");
   await expect(page.getByTestId("canvas")).toBeVisible();
   const box = (await page.getByTestId("canvas").boundingBox())!;
@@ -63,24 +63,24 @@ test("wiring a Kafka of the wrong type is refused with the validators' message; 
   await page.locator(".toast .icon-btn").first().click();
   await expect(page.locator(`[data-testid^="rf__edge-XmlToJson->${OUT}|"]`).first()).toHaveCount(0);
 
-  // A dotnet processor reads one Kafka: a second XmlPackets Kafka can't feed XmlToJson too.
+  // A dotnet operator reads one Kafka: a second XmlPackets Kafka can't feed XmlToJson too.
   await page.getByTestId("tab-datasets").click();
   await page.getByTestId("add-dataset").click();
   await page.getByTestId("new-dataset-name").fill("Replay");
   await page.getByTestId("new-dataset-topic").fill("raw.xml.replay");
   await page.getByTestId("new-dataset-types").selectOption(["XmlPackets"]);
   await page.getByTestId("new-dataset-add").click();
-  await page.getByTestId("tab-processors").click();
+  await page.getByTestId("tab-operators").click();
   await expect(page.getByTestId("node-dataset:Replay")).toBeVisible();
   await page.getByTestId("node-dataset:Replay").dragTo(page.getByTestId("canvas"), { targetPosition: { x: box.width * 0.15, y: box.height / 2 + 160 } });
   await wire(page, handle(page, "dataset:Replay", "out"), handle(page, "XmlToJson", "in"));
-  await expect(page.getByTestId("connection-refused").filter({ hasText: "XmlToJson: already reads Input; a dotnet processor reads one Kafka" })).toHaveCount(1);
+  await expect(page.getByTestId("connection-refused").filter({ hasText: "XmlToJson: already reads Input; a dotnet operator reads one Kafka" })).toHaveCount(1);
   await expect(page.locator(".react-flow__edge")).toHaveCount(1);
   await dropCard(page, "Isp", box.width * 0.55, box.height / 2 - 150);
 
-  // Processors only connect through a Kafka.
+  // Operators only connect through a Kafka.
   await wire(page, handle(page, "XmlToJson", "out"), handle(page, "Isp", "in"));
-  await expect(page.getByTestId("connection-refused").filter({ hasText: "processors connect through a Kafka" })).toHaveCount(1);
+  await expect(page.getByTestId("connection-refused").filter({ hasText: "operators connect through a Kafka" })).toHaveCount(1);
   await expect(page.locator(".react-flow__edge")).toHaveCount(1);
 });
 

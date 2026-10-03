@@ -1,4 +1,4 @@
-"""Processor discovery against a fake GitLab (local git repos)."""
+"""Operator discovery against a fake GitLab (local git repos)."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def commit(repo, files: dict[str, str], message: str, tag: str | None = None):
 
 
 @pytest.mark.anyio
-async def test_one_processor_per_repo_root(fake):
+async def test_one_operator_per_repo_root(fake):
     found = await discovery(fake).scan_project(XMLTOJSON)
     assert set(found) == {f"{XMLTOJSON}:"}
     x = found[f"{XMLTOJSON}:"]
@@ -49,15 +49,15 @@ async def test_versions_sort_by_semver(demo_root, fake):
 
 
 @pytest.mark.anyio
-async def test_folders_with_processor_yaml_in_a_monorepo(demo_root, fake):
+async def test_folders_with_operator_yaml_in_a_monorepo(demo_root, fake):
     repo = demo_root / "team-b" / "enrichers"
     repo.mkdir(parents=True)
     demo._git(repo, "init", "-q", "-b", "main")
     commit(repo, {
         "GeoTag/operator.yaml": "name: GeoTag\ndescription: g\nRuntime: dotnet\nin: [Packets]\nout: [Packets]\n",
-        "GeoTag/bin/Release/operator.yaml": "name: build output, not a processor\n",
+        "GeoTag/bin/Release/operator.yaml": "name: build output, not an operator\n",
         "Shout/operator.yaml": "name: Shout\ndescription: s\nRuntime: flink\nin: [Packets]\nout: [Bogus]\n",
-    }, "two processors", tag="GeoTag/v0.1.0")
+    }, "two operators", tag="GeoTag/v0.1.0")
     found = await discovery(fake).scan_project("team-b/enrichers")
     assert set(found) == {"team-b/enrichers:GeoTag", "team-b/enrichers:Shout"}
     assert found["team-b/enrichers:GeoTag"].latest == "GeoTag/v0.1.0"

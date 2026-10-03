@@ -1,14 +1,14 @@
 """UI graph <-> PipelineManifest.yaml.
 
 The manifest format is the contract with foundry-platform/foundry-ci (shared/pipeline.py), so the
-UI never invents fields. On the canvas, processors and Kafkas are both nodes, and every edge is a
-`Flow:` entry: Kafka -> processor (the processor reads it) or processor -> Kafka (it writes it).
+UI never invents fields. On the canvas, operators and Kafkas are both nodes, and every edge is a
+`Flow:` entry: Kafka -> operator (the operator reads it) or operator -> Kafka (it writes it).
 Every entry under Kafkas is a node, wired or not. Node positions live in a separate
 PipelineManifest.layout.json.
 
 The manifest is written in one canonical form: the layout of the pipelines' own manifests,
-processors in topological order (ties broken by name), Kafkas in the order data flows through
-them, and Flow grouped by processor (what it reads, then what it writes). Comments above an entry
+operators in topological order (ties broken by name), Kafkas in the order data flows through
+them, and Flow grouped by operator (what it reads, then what it writes). Comments above an entry
 and at the end of a line are kept. A Flow whose entries didn't change keeps its own order and
 grouping, so saving a manifest written by hand doesn't reshuffle it.
 """
@@ -22,10 +22,10 @@ import yaml
 
 from .foundry import DATASET, dataset_node
 
-PROCESSOR_KEYS = ("Repo", "Ref", "Path")
+OPERATOR_KEYS = ("Repo", "Ref", "Path")
 KAFKA_KEYS = ("Config", "AllowedTypes", "Topic", "ConnectionSettings")
 CONNECTION_KEYS = ("Brokers", "SecurityProtocol", "SaslMechanism", "SecretRef")
-TOP_LEVEL = ("Name", "ConfigRegistry", "Kafkas", "Processors", "Flow")
+TOP_LEVEL = ("Name", "ConfigRegistry", "Kafkas", "Operators", "Flow")
 DEFAULT_REF = "main"
 
 FLOW_INDENT = "    "
@@ -95,7 +95,7 @@ _KEY_LINE_RE = re.compile(r"""^( *)(?:"([^"]+)"|'([^']+)'|([^\s#'"\-][^:#]*?)):(
 
 
 def _entry_comments(text: str) -> dict[tuple[str, str], list[str]]:
-    """The comment lines right above each Kafkas/Processors entry, as written, so a save keeps them."""
+    """The comment lines right above each Kafkas/Operators entry, as written, so a save keeps them."""
     out: dict[tuple[str, str], list[str]] = {}
     section, pending = None, []
     for line in text.splitlines():
@@ -105,7 +105,7 @@ def _entry_comments(text: str) -> dict[tuple[str, str], list[str]]:
             continue
         if (m := _SECTION_RE.match(line)) and not line.startswith(" "):
             section = m.group(1)
-        elif section in ("Kafkas", "Processors") and (m := _ENTRY_RE.match(line)) and pending:
+        elif section in ("Kafkas", "Operators") and (m := _ENTRY_RE.match(line)) and pending:
             out[(section, next(g for g in m.groups() if g is not None).strip())] = pending
         pending = []  # a blank line or anything else ends a comment block
     return out
@@ -166,7 +166,7 @@ def manifest_to_graph(text: str) -> dict:
     edges: list[dict] = []
     warnings: list[str] = []
     kafkas = raw.get("Kafkas") if isinstance(raw.get("Kafkas"), dict) else {}
-    processors = raw.get("Processors") if isinstance(raw.get("Processors"), dict) else {}
+    operators = raw.get("Operators") if isinstance(raw.get("Operators"), dict) else {}
     comments = _entry_comments(text)
 
     def extra_comments(section: str, name: str) -> dict:
@@ -176,22 +176,22 @@ def manifest_to_graph(text: str) -> dict:
         nodes.append({"id": dataset_node(str(name)), "kind": "dataset", "dataset": str(name),
                       **extra_comments("Kafkas", str(name)),
                       "datasetSpec": dict(spec) if isinstance(spec, dict) else {}})
-    for name, spec in processors.items():
-        nodes.append({"id": str(name), "kind": "processor", "processor": dict(spec) if isinstance(spec, dict) else {},
-                      **extra_comments("Processors", str(name))})
+    for name, spec in operators.items():
+        nodes.append({"id": str(name), "kind": "operator", "operator": dict(spec) if isinstance(spec, dict) else {},
+                      **extra_comments("Operators", str(name))})
 
     def node_id(name: str, other: str) -> str | None:
         if name in kafkas:
             return dataset_node(name)
-        if name in processors:
+        if name in operators:
             return name
-        # Not defined: show it (as a Kafka next to a processor, else a processor), so the error has a node.
-        as_kafka = other in processors
+        # Not defined: show it (as a Kafka next to an operator, else an operator), so the error has a node.
+        as_kafka = other in operators
         nid = dataset_node(name) if as_kafka else name
         if not any(n["id"] == nid for n in nodes):
             nodes.append({"id": nid, "kind": "dataset", "dataset": name, "datasetSpec": None} if as_kafka
-                         else {"id": nid, "kind": "processor", "processor": None})
-            warnings.append(f"Flow uses {name}, which isn't under {'Kafkas' if as_kafka else 'Processors'}")
+                         else {"id": nid, "kind": "operator", "operator": None})
+            warnings.append(f"Flow uses {name}, which isn't under {'Kafkas' if as_kafka else 'Operators'}")
         return nid
 
     flow = _flow_entries(raw, text)
@@ -224,17 +224,17 @@ def manifest_to_graph(text: str) -> dict:
 # --------------------------------------------------------------------------- #
 
 def wiring(graph: dict) -> dict[str, dict]:
-    """Each processor's Inputs and Outputs (the Kafkas it reads and writes, in name order)."""
+    """Each operator's Inputs and Outputs (the Kafkas it reads and writes, in name order)."""
     nodes = {n["id"]: n for n in graph.get("nodes", [])}
     out: dict[str, dict] = {n["id"]: {"Inputs": [], "Outputs": []}
-                            for n in nodes.values() if n.get("kind") == "processor"}
+                            for n in nodes.values() if n.get("kind") == "operator"}
     for e in graph.get("edges", []):
         s, t = nodes.get(e["source"]), nodes.get(e["target"])
         if not s or not t:
             continue
-        if s.get("kind") == "dataset" and t.get("kind") == "processor":
+        if s.get("kind") == "dataset" and t.get("kind") == "operator":
             out[t["id"]]["Inputs"].append(s["dataset"])
-        elif s.get("kind") == "processor" and t.get("kind") == "dataset":
+        elif s.get("kind") == "operator" and t.get("kind") == "dataset":
             out[s["id"]]["Outputs"].append(t["dataset"])
     for w in out.values():
         w["Inputs"] = sorted(dict.fromkeys(w["Inputs"]))
@@ -243,7 +243,7 @@ def wiring(graph: dict) -> dict[str, dict]:
 
 
 def canonical_order(wired: dict[str, dict]) -> list[str]:
-    """Kahn's algorithm with name-sorted ties; processors on a cycle go last."""
+    """Kahn's algorithm with name-sorted ties; operators on a cycle go last."""
     feeds = {t: {r for r, rw in wired.items() if r != t and set(wired[t]["Outputs"]) & set(rw["Inputs"])}
              for t in wired}
     indeg = {t: 0 for t in wired}
@@ -327,13 +327,13 @@ def graph_to_manifest(graph: dict) -> str:
         sections.append(lines)
 
     if order:
-        lines = ["Processors:"]
+        lines = ["Operators:"]
         for j, t in enumerate(order):
-            spec = dict(nodes[t].get("processor") or {})
+            spec = dict(nodes[t].get("operator") or {})
             if spec.get("Path") is not None:
                 spec["Path"] = str(spec["Path"]).strip("/")
-            spec = _ordered(spec, PROCESSOR_KEYS)
-            lines += ([""] if j else []) + _comment_lines(nodes[t]) + _value_lines(t, spec, 2, ("Processors",), trailing)
+            spec = _ordered(spec, OPERATOR_KEYS)
+            lines += ([""] if j else []) + _comment_lines(nodes[t]) + _value_lines(t, spec, 2, ("Operators",), trailing)
         sections.append(lines)
 
     flow = flow_entries(graph)

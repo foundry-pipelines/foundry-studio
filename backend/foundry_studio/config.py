@@ -17,9 +17,9 @@ def _list(value: str) -> list[str]:
 @dataclass
 class Settings:
     gitlab_url: str = "https://gitlab.com"
-    # Projects scanned for processors (folders with an operator.yaml). None: every project
+    # Projects scanned for operators (folders with an operator.yaml). None: every project
     # the token's user is a member of, re-listed so new projects show up on their own.
-    processor_projects: list[str] | None = None
+    operator_projects: list[str] | None = None
     poll_interval: float = 10.0
     # Full rescan even without events, to catch anything the events API missed.
     full_rescan_interval: float = 300.0
@@ -28,9 +28,9 @@ class Settings:
     # The pipelines Studio edits: <workspace>/<folder>/PipelineManifest.yaml, one folder (a
     # pipeline repo checkout, ideally) per pipeline. None: <repo>/workspace (or the demo's).
     workspace: Path | None = None
-    # The pipelines repo, one folder per pipeline; the workspace is kept a checkout of it. None: the
-    # workspace is a plain folder (the default with a fake GitLab).
-    pipelines_repo: str | None = "https://gitlab.com/foundry-platform/pipeline-manifests.git"
+    # The pipelines repo (a project path on this GitLab, or a URL), one folder per pipeline; the workspace is
+    # kept a checkout of it. None: the workspace is a plain folder (the default with a fake GitLab).
+    pipelines_repo: str | None = "foundry-platform/pipeline-manifests"
     # Connection profiles (kafka/<name>.json) for manifests without ConfigRegistry.Repo, and new ones.
     configs_repo: str = "foundry-platform/registries/config-registry"
     # schema-registry: its types (folders with a metadata.yaml) are the names AllowedTypes and
@@ -38,7 +38,7 @@ class Settings:
     schema_registry_repo: str = "foundry-platform/registries/schema-registry"
     # "demo" or a directory: serve GitLab from local git repos instead of gitlab.com.
     fake_gitlab: str | None = None
-    # Kafka credentials for the live feed, laid out like the processor runtime's:
+    # Kafka credentials for the live feed, laid out like the operator runtime's:
     # <secrets_dir>/<SecretRef>/username and /password.
     secrets_dir: Path = Path("/var/run/secrets/foundry")
     # Where the catalog's Brokers really are from this machine (for the live feed):
@@ -59,9 +59,8 @@ class Settings:
         s = cls()
         env = os.environ
         s.gitlab_url = env.get("GITLAB_URL", s.gitlab_url).rstrip("/")
-        s.pipelines_repo = f"{s.gitlab_url}/foundry-platform/pipeline-manifests.git"
-        if env.get("STUDIO_PROCESSOR_PROJECTS", "*").strip() not in ("", "*"):
-            s.processor_projects = _list(env["STUDIO_PROCESSOR_PROJECTS"])
+        if env.get("STUDIO_OPERATOR_PROJECTS", "*").strip() not in ("", "*"):
+            s.operator_projects = _list(env["STUDIO_OPERATOR_PROJECTS"])
         s.poll_interval = float(env.get("STUDIO_POLL_INTERVAL", s.poll_interval))
         s.full_rescan_interval = float(env.get("STUDIO_FULL_RESCAN_INTERVAL", s.full_rescan_interval))
         if env.get("FOUNDRY_SCRIPTS_DIR"):

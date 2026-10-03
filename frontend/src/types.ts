@@ -1,9 +1,9 @@
 // Shapes shared with the backend; see backend/foundry_studio/manifest.py.
 //
-// On the canvas, processors and the pipeline's Kafkas (its Kafkas: topics) are both nodes; the code
-// calls a Kafka node a "dataset". Every edge is a Flow entry: Kafka -> processor (it reads it) or
-// processor -> Kafka (it writes it). A processor writes one Kafka and reads one, except that a flink
-// processor (Runtime: flink in its operator.yaml) may read several.
+// On the canvas, operators and the pipeline's Kafkas (its Kafkas: topics) are both nodes; the code
+// calls a Kafka node a "dataset". Every edge is a Flow entry: Kafka -> operator (it reads it) or
+// operator -> Kafka (it writes it). An operator writes one Kafka and reads one, except that a flink
+// operator (Runtime: flink in its operator.yaml) may read several.
 
 export const DATASET = "dataset:";
 export const datasetNode = (name: string) => `${DATASET}${name}`;
@@ -12,8 +12,8 @@ export const datasetName = (id: string) => (isDatasetNode(id) ? id.slice(DATASET
 
 export type ConnectionSettings = Record<string, string | number | boolean>;
 
-/** A Processors: entry. Its types and Runtime come from operator.yaml at its Ref. */
-export interface Processorspec {
+/** A Operators: entry. Its types and Runtime come from operator.yaml at its Ref. */
+export interface Operatorspec {
   Repo?: string;
   Path?: string;
   Ref?: string;
@@ -29,12 +29,12 @@ export interface DatasetSpec {
   [key: string]: unknown;
 }
 
-export type NodeKind = "processor" | "dataset";
+export type NodeKind = "operator" | "dataset";
 
 export interface GraphNode {
   id: string;
   kind: NodeKind;
-  processor?: Processorspec;
+  operator?: Operatorspec;
   dataset?: string; // its key under Kafkas, for a Kafka node
   datasetSpec?: DatasetSpec | null; // null: used in Flow but not defined under Kafkas
   comments?: string[]; // the "# ..." lines above its entry in the manifest, written back on save
@@ -101,7 +101,7 @@ export interface Version {
   runtime: "dotnet" | "flink";
 }
 
-export interface ProcessorInfo {
+export interface OperatorInfo {
   id: string;
   project: string;
   path: string;
@@ -126,7 +126,7 @@ export interface WatcherStatus {
   errors: Record<string, string>;
   projects: string[];
   scope?: "fixed" | "membership";
-  withProcessors?: string[];
+  withOperators?: string[];
   ready: boolean;
 }
 
@@ -139,7 +139,7 @@ export interface Health {
   workspace: string;
   configsRepo: string;
   schemaRegistryRepo: string;
-  processorProjects: string[];
+  operatorProjects: string[];
   watcher: WatcherStatus;
 }
 
