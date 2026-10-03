@@ -4,4 +4,3 @@ image:
   pullPolicy: IfNotPresent      # tags are commit SHAs
 envSecret: foundry-studio-env   # GITLAB_TOKEN etc.
 nodePort: 30082
-storage: 5Gi

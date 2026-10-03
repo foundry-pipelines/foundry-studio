@@ -23,7 +23,7 @@ from .foundry import Foundry
 from .gitlab import GitLab, HttpGitLab
 from .manifest import graph_to_manifest
 from .peek import PeekError, TypeChecker, bind, client_config, demo_feed, kafka_feed
-from .pipelines import PipelineError, PipelineStore, PipelineSync
+from .pipelines import PipelineError, PipelineRepo
 from .sources import SourceError, Sources
 from .validation import Validator, declarations
 from .watcher import EventBus, Watcher
@@ -52,25 +52,21 @@ class EdgeBody(BaseModel):
 
 
 class Services:
-    def __init__(self, settings: Settings, gitlab: GitLab, foundry: Foundry, fake_root: Path | None = None,
-                 workspace: Path | None = None):
+    def __init__(self, settings: Settings, gitlab: GitLab, foundry: Foundry, fake_root: Path | None = None):
         self.settings = settings
         self.gitlab = gitlab
         self.foundry = foundry
         self.fake_root = fake_root
         self.bus = EventBus()
-        self.workspace = workspace or settings.workspace or REPO_ROOT / "workspace"
         self.validator = Validator(foundry)
-        self.pipelines = PipelineStore(self.workspace)
+        self.pipelines = PipelineRepo(gitlab, settings.pipelines_repo) if settings.pipelines_repo else None
         self.sources = Sources(gitlab, settings.gitlab_url, foundry.pipeline, settings.configs_repo,
                                settings.schema_registry_repo)
         self.discovery = Discovery(gitlab, lambda: self.sources.type_names)
         self.peeks = asyncio.Semaphore(8)  # concurrent live feeds
         self.watcher = Watcher(gitlab, self.discovery, self.bus, settings.operator_projects,
                                settings.poll_interval, settings.full_rescan_interval,
-                               pipelines=PipelineSync(self.workspace, self.sources.url_of(settings.pipelines_repo),
-                                                      self.sources.project_of(settings.pipelines_repo))
-                               if settings.pipelines_repo else None)
+                               pipelines_project=settings.pipelines_repo)
 
     async def context(self, graph: dict) -> dict:
         """What validating a graph needs besides the graph: profiles, schema-registry types, operator.yaml files."""
@@ -132,14 +128,12 @@ def build_services(settings: Settings) -> Services:
         if not fake_root.exists():
             demo.init(fake_root)
         gitlab: GitLab = FakeGitLab(fake_root)
-        workspace = settings.workspace or demo.workspace(fake_root)
     else:
         gitlab = HttpGitLab(settings.gitlab_url, settings.token)
-        workspace = settings.workspace or REPO_ROOT / "workspace"
     fake_projects = ([p["path_with_namespace"] for p in FakeGitLab(fake_root).projects_sync()]
                      if fake_root else [])
     gitenv.configure(os.environ, gitlab_url=settings.gitlab_url, fake_root=fake_root, fake_projects=fake_projects)
-    return Services(settings, gitlab, foundry, fake_root, workspace)
+    return Services(settings, gitlab, foundry, fake_root)
 
 
 def create_app(services: Services | None = None, start_watcher: bool = True) -> FastAPI:
@@ -174,7 +168,7 @@ def create_app(services: Services | None = None, start_watcher: bool = True) -> 
             "tokenConfigured": bool(s.settings.token),
             "webhookConfigured": bool(s.settings.webhook_secret),
             "scriptsCommit": s.foundry.commit,
-            "workspace": str(s.workspace),
+            "pipelinesRepo": s.settings.pipelines_repo,
             "configsRepo": s.settings.configs_repo,
             "schemaRegistryRepo": s.settings.schema_registry_repo,
             "operatorProjects": s.watcher.projects_with_operators,
@@ -216,24 +210,39 @@ def create_app(services: Services | None = None, start_watcher: bool = True) -> 
 
     @app.get("/api/pipelines")
     async def list_pipelines(request: Request):
-        return {"pipelines": await asyncio.to_thread(svc(request).pipelines.list)}
+        s = svc(request)
+        if not s.pipelines:
+            return {"pipelines": []}
+        return {"pipelines": await s.pipelines.list()}
 
     @app.get("/api/datasets")
     async def datasets(request: Request):
-        return {"datasets": await asyncio.to_thread(svc(request).pipelines.datasets)}
+        s = svc(request)
+        if not s.pipelines:
+            return {"datasets": []}
+        return {"datasets": await s.pipelines.datasets()}
 
     @app.get("/api/pipelines/{folder}")
     async def load_pipeline(folder: str, request: Request):
-        return await asyncio.to_thread(svc(request).pipelines.load, folder)
+        s = svc(request)
+        if not s.pipelines:
+            raise HTTPException(404, "no pipelines repo configured")
+        return await s.pipelines.load(folder)
 
-    @app.put("/api/pipelines/{folder}")
-    async def save_pipeline(folder: str, body: SaveBody, request: Request):
-        return await asyncio.to_thread(svc(request).pipelines.save, folder, body.graph, body.layout)
+    @app.post("/api/deploy")
+    async def deploy_pipeline(body: SaveBody, request: Request):
+        """Commit to a branch and open an MR on the pipelines repo."""
+        s = svc(request)
+        if not s.pipelines:
+            raise HTTPException(404, "no pipelines repo configured")
+        folder = body.graph.get("_folder")  # set by the frontend for existing pipelines
+        graph = {k: v for k, v in body.graph.items() if k != "_folder"}
+        return await s.pipelines.deploy(folder, graph, body.layout)
 
-    @app.post("/api/pipelines")
-    async def create_pipeline(body: SaveBody, request: Request):
-        """A new pipeline, in a new folder named after it."""
-        return await asyncio.to_thread(svc(request).pipelines.save, None, body.graph, body.layout)
+    @app.post("/api/export")
+    async def export_pipeline(body: GraphBody):
+        """Return the rendered manifest YAML (for browser download)."""
+        return {"manifest": graph_to_manifest(body.graph)}
 
     @app.post("/api/manifest")
     async def manifest(body: GraphBody):

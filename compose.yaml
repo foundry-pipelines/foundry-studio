@@ -15,8 +15,3 @@ services:
       GITLAB_URL: ${GITLAB_URL:-https://gitlab.com}
       GITLAB_TOKEN: ${GITLAB_TOKEN:-}
       GITLAB_WEBHOOK_SECRET: ${GITLAB_WEBHOOK_SECRET:-}
-    volumes:
-      - workspace:/opt/foundry-studio/workspace
-
-volumes:
-  workspace:

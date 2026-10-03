@@ -136,7 +136,7 @@ export interface Health {
   tokenConfigured: boolean;
   webhookConfigured: boolean;
   scriptsCommit: string | null;
-  workspace: string;
+  pipelinesRepo: string | null;
   configsRepo: string;
   schemaRegistryRepo: string;
   operatorProjects: string[];
@@ -160,7 +160,6 @@ export interface LoadedPipeline {
   graph: Graph;
   layout: Layout | null;
   manifest: string;
-  path: string;
   folder: string;
 }
 

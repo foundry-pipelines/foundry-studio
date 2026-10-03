@@ -1,16 +1,13 @@
-"""The workspace: one folder per pipeline; Save writes PipelineManifest.yaml and the layout."""
+"""Pipelines are read from git and deployed via commits API + MR."""
 
 from __future__ import annotations
-
-import json
 
 import pytest
 from fastapi.testclient import TestClient
 
 from foundry_studio import demo
 from foundry_studio.app import create_app
-from foundry_studio.manifest import manifest_to_graph
-from foundry_studio.pipelines import PipelineError, PipelineStore
+from foundry_studio.pipelines import PipelineError
 
 
 @pytest.fixture
@@ -19,48 +16,54 @@ def client(services):
         yield c
 
 
-def test_lists_folders_with_a_manifest(client, demo_root):
-    (demo.workspace(demo_root) / "notes").mkdir()
-    assert client.get("/api/pipelines").json() == {"pipelines": [{"folder": "PacketPipeline", "name": "EnrichmentPipeline"}]}
+def test_lists_pipelines_from_git(client):
+    pipelines = client.get("/api/pipelines").json()["pipelines"]
+    assert any(p["folder"] == "PacketPipeline" for p in pipelines)
 
 
-def test_load_and_save_round_trip(client, demo_root):
+def test_load_pipeline_from_git(client):
     loaded = client.get("/api/pipelines/PacketPipeline").json()
-    assert loaded["folder"] == "PacketPipeline" and loaded["layout"] is None
+    assert loaded["folder"] == "PacketPipeline"
+    assert loaded["graph"]["name"] == "EnrichmentPipeline"
+    assert "manifest" in loaded
+
+
+def test_deploy_creates_branch_and_mr(client):
+    loaded = client.get("/api/pipelines/PacketPipeline").json()
+    graph = loaded["graph"]
     layout = {"version": 1, "positions": {"Isp": {"x": 1, "y": 2}}}
-    r = client.put("/api/pipelines/PacketPipeline", json={"graph": loaded["graph"], "layout": layout}).json()
-    folder = demo.workspace(demo_root) / "PacketPipeline"
-    assert (folder / "PipelineManifest.yaml").read_text() == demo.MANIFEST
-    assert json.loads((folder / "PipelineManifest.layout.json").read_text()) == layout
-    assert r["folder"] == "PacketPipeline"
+    r = client.post("/api/deploy", json={"graph": {**graph, "_folder": "PacketPipeline"}, "layout": layout})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["folder"] == "PacketPipeline"
+    assert body["branch"].startswith("studio/PacketPipeline-")
+    assert body["mr"]["iid"] == 1
+    assert "url" in body["mr"]
 
 
-def test_renaming_keeps_the_folder(client, demo_root):
-    graph = client.get("/api/pipelines/PacketPipeline").json()["graph"]
-    client.put("/api/pipelines/PacketPipeline", json={"graph": {**graph, "name": "Renamed"}})
-    assert client.get("/api/pipelines").json()["pipelines"] == [{"folder": "PacketPipeline", "name": "Renamed"}]
-
-
-def test_new_pipeline_gets_its_own_folder(client, demo_root):
+def test_deploy_new_pipeline(client):
     template = client.get("/api/template").json()
-    assert template["configs"] == {"Repo": "foundry-platform/registries/config-registry", "Ref": "main"}
-    r = client.post("/api/pipelines", json={"graph": {**template, "name": "Fresh"}})
-    assert r.json()["folder"] == "Fresh"
-    assert manifest_to_graph((demo.workspace(demo_root) / "Fresh" / "PipelineManifest.yaml").read_text())["name"] == "Fresh"
-    assert client.post("/api/pipelines", json={"graph": {**template, "name": "Fresh"}}).status_code == 409
-    assert client.post("/api/pipelines", json={"graph": {**template, "name": "../up"}}).status_code == 400
+    r = client.post("/api/deploy", json={"graph": {**template, "name": "Fresh"}, "layout": None})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["folder"] == "Fresh"
+    assert body["branch"].startswith("studio/Fresh-")
 
 
-def test_datasets_across_the_workspace(client):
+def test_export_returns_manifest_yaml(client):
+    loaded = client.get("/api/pipelines/PacketPipeline").json()
+    r = client.post("/api/export", json={"graph": loaded["graph"]})
+    assert r.status_code == 200
+    assert "Name: EnrichmentPipeline" in r.json()["manifest"]
+
+
+def test_datasets_across_pipelines(client):
     names = {(d["folder"], d["name"], d["spec"]["Topic"]) for d in client.get("/api/datasets").json()["datasets"]}
     assert ("PacketPipeline", "Output", "packets.enriched") in names and len(names) == 3
 
 
-def test_bad_names_and_missing_pipelines(tmp_path):
-    store = PipelineStore(tmp_path)
+def test_bad_names_rejected():
+    from foundry_studio.pipelines import check_name
     with pytest.raises(PipelineError) as e:
-        store.load("../etc")
+        check_name("../etc")
     assert e.value.status == 400
-    with pytest.raises(PipelineError) as e:
-        store.load("Nope")
-    assert e.value.status == 404

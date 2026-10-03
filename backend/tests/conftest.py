@@ -48,5 +48,4 @@ def fake(demo_root: Path) -> FakeGitLab:
 
 @pytest.fixture
 def services(demo_root: Path, fake: FakeGitLab, foundry: Foundry) -> Services:
-    return Services(Settings(scripts_dir=SCRIPTS_DIR), fake, foundry, fake_root=demo_root,
-                    workspace=demo.workspace(demo_root))
+    return Services(Settings(scripts_dir=SCRIPTS_DIR), fake, foundry, fake_root=demo_root)

@@ -178,5 +178,44 @@ class FakeGitLab:
     async def list_events(self, project: str) -> list[dict]:
         return await asyncio.to_thread(self.events_sync, project)
 
+    def create_branch_sync(self, project: str, branch: str, ref: str) -> dict:
+        self._git(project, "branch", branch, ref)
+        sha = self._git(project, "rev-parse", branch).strip()
+        return {"name": branch, "commit": {"id": sha}}
+
+    def create_commit_sync(self, project: str, branch: str, message: str, actions: list[dict]) -> dict:
+        import os
+        repo = self.repo(project)
+        # Check out the branch in a detached way to apply actions
+        self._git(project, "checkout", "-q", branch)
+        for action in actions:
+            path = repo / action["file_path"]
+            if action["action"] in ("create", "update"):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(action["content"])
+            elif action["action"] == "delete":
+                path.unlink(missing_ok=True)
+            self._git(project, "add", action["file_path"])
+        env = {**os.environ, "GIT_AUTHOR_NAME": "Studio", "GIT_AUTHOR_EMAIL": "studio@test",
+               "GIT_COMMITTER_NAME": "Studio", "GIT_COMMITTER_EMAIL": "studio@test"}
+        subprocess.run(["git", "-c", "commit.gpgsign=false", "commit", "-q", "-m", message],
+                       cwd=repo, env=env, check=True, capture_output=True)
+        sha = self._git(project, "rev-parse", "HEAD").strip()
+        return {"id": sha, "short_id": sha[:8], "title": message,
+                "web_url": f"{self.web_base}/{project}/-/commit/{sha}"}
+
+    def create_mr_sync(self, project: str, source: str, target: str, title: str) -> dict:
+        return {"iid": 1, "title": title, "source_branch": source, "target_branch": target,
+                "web_url": f"{self.web_base}/{project}/-/merge_requests/1"}
+
+    async def create_branch(self, project: str, branch: str, ref: str) -> dict:
+        return await asyncio.to_thread(self.create_branch_sync, project, branch, ref)
+
+    async def create_commit(self, project: str, branch: str, message: str, actions: list[dict]) -> dict:
+        return await asyncio.to_thread(self.create_commit_sync, project, branch, message, actions)
+
+    async def create_mr(self, project: str, source: str, target: str, title: str) -> dict:
+        return await asyncio.to_thread(self.create_mr_sync, project, source, target, title)
+
     async def aclose(self) -> None:
         pass

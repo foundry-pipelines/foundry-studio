@@ -76,23 +76,52 @@ function LiveToggle() {
   );
 }
 
-/** Save the pipeline to its folder (a new one: a new folder named after it). Resolves true when saved. */
-export async function saveAll(): Promise<boolean> {
+/** Export: download the rendered PipelineManifest.yaml to the browser. */
+export async function exportManifest(): Promise<void> {
   const s = useStudio.getState();
-  useStudio.setState({ busy: "save" });
+  useStudio.setState({ busy: "export" });
   try {
-    const res = await api.save(s.origin.kind === "saved" ? s.origin.folder : null, s.graph(), s.layout());
+    const res = await api.exportManifest(s.graph());
+    const name = s.meta?.name || "pipeline";
+    const blob = new Blob([res.manifest], { type: "text/yaml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name}.PipelineManifest.yaml`;
+    a.click();
+    URL.revokeObjectURL(url);
+    s.toast({ kind: "success", text: `Exported ${name}.PipelineManifest.yaml` });
+  } catch (e) {
+    const err = e as ApiError;
+    s.toast({ kind: "error", text: `Export failed: ${err.message}` }, 9000);
+  } finally {
+    useStudio.setState({ busy: null });
+  }
+}
+
+/** Deploy: commit to a branch in pipeline-manifests and open an MR. */
+export async function deployPipeline(): Promise<boolean> {
+  const s = useStudio.getState();
+  useStudio.setState({ busy: "deploy" });
+  try {
+    const folder = s.origin.kind === "saved" ? s.origin.folder : null;
+    const res = await api.deploy(folder, s.graph(), s.layout());
     s.markSaved({ kind: "saved", folder: res.folder });
     const url = new URL(window.location.href);
     url.search = new URLSearchParams({ pipeline: res.folder }).toString();
     window.history.replaceState(null, "", url);
-    s.toast({ kind: "success", text: `Saved ${res.path}`, testId: "saved" });
+    s.toast({
+      kind: "success",
+      text: `Deployed → MR !${res.mr.iid}`,
+      link: { href: res.mr.url, label: "Open MR" },
+      testId: "deployed",
+    });
     const p = await api.pipelines();
     useStudio.setState({ pipelines: p.pipelines });
     return true;
   } catch (e) {
     const err = e as ApiError;
-    s.toast({ kind: "error", text: `Save failed: ${err.message}${err.errors?.length ? ` — ${err.errors[0].message}` : ""}` }, 9000);
+    s.toast({ kind: "error", text: `Deploy failed: ${err.message}${err.errors?.length ? ` — ${err.errors[0].message}` : ""}` }, 9000);
     return false;
   } finally {
     useStudio.setState({ busy: null });
@@ -166,8 +195,11 @@ export function TopBar({ onOpen, onNew }: { onOpen: (name: string) => void; onNe
         {health?.mode === "demo" ? " · demo" : ""}
       </div>
       <LiveToggle />
-      <button className="btn btn-primary" onClick={() => void saveAll()} disabled={!meta?.name || busy !== null} data-testid="save">
-        {busy === "save" ? "Saving…" : "Save"}
+      <button className="btn btn-secondary" onClick={() => void exportManifest()} disabled={!meta?.name || busy !== null} data-testid="export">
+        {busy === "export" ? "Exporting…" : "Export"}
+      </button>
+      <button className="btn btn-primary" onClick={() => void deployPipeline()} disabled={!meta?.name || busy !== null} data-testid="deploy">
+        {busy === "deploy" ? "Deploying…" : "Deploy"}
       </button>
     </header>
   );

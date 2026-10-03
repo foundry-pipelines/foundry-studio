@@ -5,8 +5,7 @@ node_modules/
 frontend/dist/
 frontend/test-results/
 frontend/playwright-report/
-# Local drafts written by Save, and the offline demo's git repos
-workspace/
+# The offline demo's git repos
 .demo-gitlab/
 .env
 *.tsbuildinfo

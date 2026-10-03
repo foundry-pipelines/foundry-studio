@@ -87,7 +87,7 @@ interface State {
   liveStage: string | null; // the node whose data Live data shows
   feeds: Record<string, FeedState>; // by dataset name
   versionPickerFor: string | null;
-  busy: "save" | null;
+  busy: "deploy" | "export" | null;
 
   graph: () => Graph;
   layout: () => Layout;

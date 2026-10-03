@@ -8,8 +8,8 @@
 The repos mirror the real ones: foundry-platform/registries/config-registry (connection profiles),
 foundry-platform/registries/schema-registry (the type names) and one foundry-platform/example-operators
 project per operator, each with an operator.yaml at its root. The
-workspace holds PacketPipeline. Nothing here needs a token, Docker or Kafka; Live data shows
-generated records.
+pipeline-manifests holds PacketPipeline. Nothing here needs a token, Docker or Kafka; Live data
+shows generated records.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ DEFAULT_ROOT = REPO_ROOT / ".demo-gitlab"
 CONFIGS = "foundry-platform/registries/config-registry"
 SCHEMA_REGISTRY = "foundry-platform/registries/schema-registry"
 OPERATORS_GROUP = "foundry-platform/example-operators"
+PIPELINES = "foundry-platform/pipeline-manifests"
 
 # Fixed dates keep commit SHAs identical across `init` runs.
 FIXED_DATE = "2026-09-01T12:00:00+00:00"
@@ -101,7 +102,8 @@ Flow:
 
 
 def workspace(root: Path) -> Path:
-    return root / "workspace"
+    """Legacy: tests that still reference the workspace path."""
+    return root / PIPELINES
 
 
 def _git(repo: Path, *args: str, date: str | None = None) -> str:
@@ -152,9 +154,7 @@ def init(root: Path = DEFAULT_ROOT) -> Path:
     _repo(root, SCHEMA_REGISTRY, REGISTRY_FILES, "Pipeline types")
     for project, (name, i, o, desc) in OPERATORS.items():
         _repo(root, f"{OPERATORS_GROUP}/{project}", operator_files(name, i, o, description=desc), f"{name} 1.0.0", "v1.0.0")
-    # A plain folder (not a git repo), so the fake GitLab doesn't list it as a project.
-    (workspace(root) / "PacketPipeline").mkdir(parents=True)
-    (workspace(root) / "PacketPipeline" / "PipelineManifest.yaml").write_text(MANIFEST)
+    _repo(root, PIPELINES, {"PacketPipeline/PipelineManifest.yaml": MANIFEST}, "PacketPipeline manifest")
     return root
 
 

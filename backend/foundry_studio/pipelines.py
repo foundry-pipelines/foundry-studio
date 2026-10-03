@@ -1,22 +1,21 @@
-"""The workspace: one folder per pipeline, normally a checkout of the pipelines repo (PipelineSync).
+"""Pipeline manifests, read from and deployed to the pipeline-manifests repo via GitLab API.
 
-    <workspace>/<folder>/PipelineManifest.yaml           the pipeline
-    <workspace>/<folder>/PipelineManifest.layout.json    node positions (the sidecar)
+    <repo>/<folder>/PipelineManifest.yaml           the pipeline
 
-A pipeline is known by its folder; its Name is a field in the manifest. A new pipeline gets a
-folder named after it. Studio only edits and displays these files: Save writes them and
-nothing else, and committing and pushing is up to you.
+A pipeline is known by its folder; its Name is a field in the manifest. Studio reads
+manifests from git and edits them in-browser. Export downloads the YAML; Deploy commits
+to a branch and opens an MR.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import re
-from pathlib import Path
+import time
 
 import yaml
 
+from .gitlab import GitLab, GitLabError
 from .manifest import graph_to_manifest, manifest_to_graph
 
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -38,29 +37,50 @@ def check_name(name: str) -> str:
     return name
 
 
-class PipelineStore:
-    def __init__(self, workspace: Path):
-        self.workspace = workspace
+class PipelineRepo:
+    """Reads pipelines from GitLab and deploys changes via the commits API."""
 
-    def list(self) -> list[dict]:
+    def __init__(self, gitlab: GitLab, project: str):
+        self.gitlab = gitlab
+        self.project = project
+
+    async def _default_branch(self) -> str:
+        proj = await self.gitlab.get_project(self.project)
+        return proj["default_branch"]
+
+    async def list(self) -> list[dict]:
+        branch = await self._default_branch()
+        try:
+            tree = await self.gitlab.list_tree(self.project, branch, recursive=False)
+        except GitLabError:
+            return []
+        folders = sorted(
+            (e["name"] for e in tree if e["type"] == "tree" and NAME_RE.match(e["name"])),
+            key=str.lower,
+        )
         out = []
-        if self.workspace.is_dir():
-            for d in sorted(self.workspace.iterdir(), key=lambda p: p.name.lower()):
-                if (d / MANIFEST).is_file() and NAME_RE.match(d.name):
-                    try:
-                        name = manifest_to_graph((d / MANIFEST).read_text())["name"]
-                    except (ValueError, yaml.YAMLError):  # still listed, so it can be opened and fixed
-                        name = ""
-                    out.append({"folder": d.name, "name": name or d.name})
+        for folder in folders:
+            raw = await self.gitlab.get_file(self.project, f"{folder}/{MANIFEST}", branch)
+            if raw is None:
+                continue
+            try:
+                name = manifest_to_graph(raw.decode())["name"]
+            except (ValueError, yaml.YAMLError, UnicodeDecodeError):
+                name = ""
+            out.append({"folder": folder, "name": name or folder})
         return out
 
-    def datasets(self) -> list[dict]:
-        """Every pipeline's Kafkas entries, for reusing a topic another pipeline already defines."""
+    async def datasets(self) -> list[dict]:
+        branch = await self._default_branch()
+        pipelines = await self.list()
         out = []
-        for p in self.list():
+        for p in pipelines:
+            raw_bytes = await self.gitlab.get_file(self.project, f"{p['folder']}/{MANIFEST}", branch)
+            if raw_bytes is None:
+                continue
             try:
-                raw = yaml.safe_load((self.workspace / p["folder"] / MANIFEST).read_text()) or {}
-            except yaml.YAMLError:
+                raw = yaml.safe_load(raw_bytes.decode()) or {}
+            except (yaml.YAMLError, UnicodeDecodeError):
                 continue
             datasets = raw.get("Kafkas") if isinstance(raw, dict) else None
             for name, spec in (datasets if isinstance(datasets, dict) else {}).items():
@@ -68,75 +88,68 @@ class PipelineStore:
                     out.append({"folder": p["folder"], "pipeline": p["name"], "name": str(name), "spec": spec})
         return out
 
-    def load(self, folder: str) -> dict:
+    async def load(self, folder: str) -> dict:
         check_name(folder)
-        f = self.workspace / folder / MANIFEST
-        if not f.is_file():
-            raise PipelineError(404, f"no {MANIFEST} in {self.workspace / folder}")
-        text = f.read_text()
+        branch = await self._default_branch()
+        raw = await self.gitlab.get_file(self.project, f"{folder}/{MANIFEST}", branch)
+        if raw is None:
+            raise PipelineError(404, f"no {MANIFEST} in {self.project}/{folder}")
+        text = raw.decode()
         try:
             graph = manifest_to_graph(text)
         except (ValueError, yaml.YAMLError) as e:
-            raise PipelineError(422, f"{f}: {e}")
-        layout_file = self.workspace / folder / LAYOUT
-        layout = json.loads(layout_file.read_text()) if layout_file.is_file() else None
-        return {"graph": graph, "layout": layout, "manifest": text, "path": str(f), "folder": folder}
+            raise PipelineError(422, f"{folder}/{MANIFEST}: {e}")
+        layout_raw = await self.gitlab.get_file(self.project, f"{folder}/{LAYOUT}", branch)
+        layout = json.loads(layout_raw.decode()) if layout_raw else None
+        return {"graph": graph, "layout": layout, "manifest": text, "folder": folder}
 
-    def save(self, folder: str | None, graph: dict, layout: dict | None) -> dict:
-        """Save to folder, or for a new pipeline (folder None) to a new folder named after it."""
+    async def deploy(self, folder: str | None, graph: dict, layout: dict | None) -> dict:
+        """Commit the manifest to a new branch and open an MR."""
+        pipeline_name = str(graph.get("name") or "")
         if folder is None:
-            folder = check_name(str(graph.get("name") or ""))
-            if (self.workspace / folder / MANIFEST).exists():
-                raise PipelineError(409, f"{self.workspace / folder} already has a pipeline; open it instead")
-        target = self.workspace / check_name(folder)
-        target.mkdir(parents=True, exist_ok=True)
-        (target / MANIFEST).write_text(graph_to_manifest(graph))
+            folder = check_name(pipeline_name)
+        else:
+            check_name(folder)
+
+        branch = await self._default_branch()
+        manifest_text = graph_to_manifest(graph)
+        timestamp = int(time.time())
+        deploy_branch = f"studio/{folder}-{timestamp}"
+
+        actions = [
+            {"action": "update" if await self.gitlab.get_file(self.project, f"{folder}/{MANIFEST}", branch) else "create",
+             "file_path": f"{folder}/{MANIFEST}",
+             "content": manifest_text},
+        ]
         if layout is not None:
-            (target / LAYOUT).write_text(json.dumps(layout, indent=2, sort_keys=True) + "\n")
-        return {"path": str(target / MANIFEST), "layout": str(target / LAYOUT), "folder": folder}
+            layout_text = json.dumps(layout, indent=2, sort_keys=True) + "\n"
+            existing_layout = await self.gitlab.get_file(self.project, f"{folder}/{LAYOUT}", branch)
+            actions.append({
+                "action": "update" if existing_layout else "create",
+                "file_path": f"{folder}/{LAYOUT}",
+                "content": layout_text,
+            })
 
-
-class PipelineSync:
-    """Keeps the workspace a checkout of the pipelines repo (one folder per pipeline): cloned into
-    an empty workspace, then fast-forwarded on every push, unless Studio has saved changes that
-    aren't committed yet (a dirty tree), which are never overwritten. Credentials come from the
-    environment gitenv set up."""
-
-    def __init__(self, workspace: Path, repo: str, project: str):
-        self.workspace = workspace
-        self.repo = repo
-        self.project = project
-        self.errors: dict[str, str] = {}
-
-    async def _git(self, *args: str) -> str:
-        proc = await asyncio.create_subprocess_exec(
-            "git", *args, cwd=self.workspace, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        out, err = await proc.communicate()
-        if proc.returncode:
-            raise PipelineError(502, f"git {args[0]}: {err.decode().strip() or proc.returncode}")
-        return out.decode().strip()
-
-    async def sync(self) -> bool:
-        """Clone or fast-forward; True when the workspace changed."""
         try:
-            if not (self.workspace / ".git").exists():
-                self.workspace.mkdir(parents=True, exist_ok=True)
-                if any(self.workspace.iterdir()):
-                    raise PipelineError(409, f"{self.workspace} isn't empty and isn't a checkout of {self.repo}")
-                await self._git("clone", "-q", self.repo, ".")
-                changed = True
-            else:
-                # A moved or renamed repo: follow it. Unrelated history still fails the --ff-only merge below.
-                if await self._git("remote", "get-url", "origin") != self.repo:
-                    await self._git("remote", "set-url", "origin", self.repo)
-                before = await self._git("rev-parse", "HEAD")
-                await self._git("fetch", "-q", "origin")
-                if await self._git("status", "--porcelain", "--untracked-files=no"):
-                    raise PipelineError(409, f"the workspace has changes not in git; not updating it from {self.project}")
-                await self._git("merge", "-q", "--ff-only", "@{u}")
-                changed = await self._git("rev-parse", "HEAD") != before
-        except PipelineError as e:
-            self.errors[self.project] = str(e)
-            return False
-        self.errors.pop(self.project, None)
-        return changed
+            await self.gitlab.create_branch(self.project, deploy_branch, branch)
+        except GitLabError as e:
+            raise PipelineError(502, f"failed to create branch {deploy_branch}: {e}")
+
+        commit_msg = f"studio: update {pipeline_name or folder}"
+        try:
+            commit = await self.gitlab.create_commit(self.project, deploy_branch, commit_msg, actions)
+        except GitLabError as e:
+            raise PipelineError(502, f"failed to commit: {e}")
+
+        mr_title = f"Studio: update {pipeline_name or folder}"
+        try:
+            mr = await self.gitlab.create_mr(self.project, deploy_branch, branch, mr_title)
+        except GitLabError as e:
+            raise PipelineError(502, f"committed to {deploy_branch} but MR creation failed: {e}")
+
+        return {
+            "folder": folder,
+            "branch": deploy_branch,
+            "commit": commit.get("id") or commit.get("short_id", ""),
+            "mr": {"iid": mr["iid"], "url": mr["web_url"], "title": mr["title"]},
+        }

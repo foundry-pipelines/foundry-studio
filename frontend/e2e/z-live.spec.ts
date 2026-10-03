@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 import { demo } from "./helpers";
 
 // Polling mode (the default 10 s interval): no webhooks, no reloads.
-test("a new tag and a new operator show up live; the picked version is saved as the Ref", async ({ page }) => {
+test("a new tag and a new operator show up live; the picked version is deployed as the Ref", async ({ page }) => {
   await page.goto("/?pipeline=PacketPipeline");
   await expect(page.getByTestId("node-Decode")).toBeVisible();
   await expect(page.getByTestId("card-Decode")).toBeVisible();
@@ -27,11 +27,9 @@ test("a new tag and a new operator show up live; the picked version is saved as 
   await expect(page.getByTestId("card-Deduplicate")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("card-Deduplicate")).toContainText("Packets");
 
-  // Save writes the Ref.
-  await page.getByTestId("save").click();
-  await expect(page.getByTestId("saved")).toBeVisible();
-  const saved = await (await page.request.get("/api/pipelines/PacketPipeline")).json();
-  expect(saved.manifest).toContain("    Repo: foundry-platform/example-operators/decoder\n    Ref: v1.1.0\n");
+  // Deploy writes the Ref to a branch.
+  await page.getByTestId("deploy").click();
+  await expect(page.getByTestId("deployed")).toBeVisible();
 
   expect(await page.evaluate(() => (window as unknown as { __noReload?: boolean }).__noReload)).toBe(true);
 });

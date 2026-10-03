@@ -23,7 +23,6 @@ import time
 
 from .discovery import Discovery, OperatorInfo
 from .gitlab import GitLab
-from .pipelines import PipelineSync
 
 log = logging.getLogger("foundry_studio.watcher")
 
@@ -55,15 +54,15 @@ class EventBus:
 class Watcher:
     def __init__(self, gitlab: GitLab, discovery: Discovery, bus: EventBus, operator_projects: list[str] | None,
                  poll_interval: float = 10.0, full_rescan_interval: float = 300.0, discovery_interval: float = 60.0,
-                 pipelines: PipelineSync | None = None):
+                 pipelines_project: str | None = None):
         self.gitlab = gitlab
-        self.pipelines = pipelines
+        self.pipelines_project = pipelines_project
         self.discovery = discovery
         self.bus = bus
         # None: every project the user is a member of.
         self.fixed_projects = list(operator_projects) if operator_projects else None
-        if self.fixed_projects is not None and pipelines and pipelines.project not in self.fixed_projects:
-            self.fixed_projects.append(pipelines.project)
+        if self.fixed_projects is not None and pipelines_project and pipelines_project not in self.fixed_projects:
+            self.fixed_projects.append(pipelines_project)
         self.operator_projects = list(self.fixed_projects or [])
         self.poll_interval = poll_interval
         self.full_rescan_interval = full_rescan_interval
@@ -128,8 +127,8 @@ class Watcher:
             return
         self._last_listing = time.monotonic()
         activity = {p["path_with_namespace"]: p.get("last_activity_at") or "" for p in listed}
-        if self.pipelines:
-            activity.setdefault(self.pipelines.project, "")
+        if self.pipelines_project:
+            activity.setdefault(self.pipelines_project, "")
         new = [p for p in activity if p not in self.operator_projects]
         changed = [p for p in activity if p in self.operator_projects
                    and activity[p] != self._listed_activity.get(p)]
@@ -177,7 +176,7 @@ class Watcher:
             "pollInterval": self.poll_interval,
             "lastPoll": self.last_poll,
             "lastWebhook": self.last_webhook,
-            "errors": {**self.errors, **(self.pipelines.errors if self.pipelines else {})},
+            "errors": dict(self.errors),
             "projects": self.operator_projects,
             "scope": "fixed" if self.fixed_projects is not None else "membership",
             "withOperators": self.projects_with_operators,
@@ -204,7 +203,7 @@ class Watcher:
         auto = self.fixed_projects is None
         if auto and (self._last_listing is None or time.monotonic() - self._last_listing >= self.discovery_interval):
             await self.refresh_projects()
-        with_operators = set(self.projects_with_operators) | ({self.pipelines.project} if self.pipelines else set())
+        with_operators = set(self.projects_with_operators) | ({self.pipelines_project} if self.pipelines_project else set())
         for project in self.operator_projects:
             async def check(project=project):
                 stale = time.monotonic() - self._last_full.get(project, 0) > self.full_rescan_interval
@@ -259,5 +258,5 @@ class Watcher:
             for tid in old.keys() - found.keys():
                 gone = self.operators.pop(tid)
                 self.bus.publish({"type": "operator.removed", "id": tid, "name": gone.name})
-        if self.pipelines and project == self.pipelines.project and await self.pipelines.sync():
+        if self.pipelines_project and project == self.pipelines_project:
             self.bus.publish({"type": "pipelines.changed", "project": project})

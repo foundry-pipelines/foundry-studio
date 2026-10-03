@@ -25,11 +25,8 @@ class Settings:
     full_rescan_interval: float = 300.0
     # Checkout of foundry-platform/foundry-ci at the pinned commit (git submodule): its validators.
     scripts_dir: Path = REPO_ROOT / "vendor" / "foundry-ci"
-    # The pipelines Studio edits: <workspace>/<folder>/PipelineManifest.yaml, one folder (a
-    # pipeline repo checkout, ideally) per pipeline. None: <repo>/workspace (or the demo's).
-    workspace: Path | None = None
-    # The pipelines repo (a project path on this GitLab, or a URL), one folder per pipeline; the workspace is
-    # kept a checkout of it. None: the workspace is a plain folder (the default with a fake GitLab).
+    # The pipelines repo (a project path on this GitLab), one folder per pipeline; read via GitLab API,
+    # deployed via commits API + MR. None disables pipeline editing.
     pipelines_repo: str | None = "foundry-platform/pipeline-manifests"
     # Connection profiles (kafka/<name>.json) for manifests without ConfigRegistry.Repo, and new ones.
     configs_repo: str = "foundry-platform/registries/config-registry"
@@ -65,8 +62,6 @@ class Settings:
         s.full_rescan_interval = float(env.get("STUDIO_FULL_RESCAN_INTERVAL", s.full_rescan_interval))
         if env.get("FOUNDRY_SCRIPTS_DIR"):
             s.scripts_dir = Path(env["FOUNDRY_SCRIPTS_DIR"]).resolve()
-        if env.get("STUDIO_WORKSPACE"):
-            s.workspace = Path(env["STUDIO_WORKSPACE"]).expanduser().resolve()
         s.configs_repo = env.get("STUDIO_CONFIGS_REPO", s.configs_repo)
         s.schema_registry_repo = env.get("STUDIO_SCHEMA_REGISTRY_REPO", s.schema_registry_repo)
         s.fake_gitlab = env.get("STUDIO_FAKE_GITLAB") or None

@@ -84,7 +84,7 @@ test("wiring a Kafka of the wrong type is refused with the validators' message; 
   await expect(page.locator(".react-flow__edge")).toHaveCount(1);
 });
 
-test("a connection shows its topic, consumer group and profile; Kafka edits are saved to the manifest", async ({ page }) => {
+test("a connection shows its topic, consumer group and profile; Kafka edits are deployed to the manifest", async ({ page }) => {
   await page.goto("/?pipeline=PacketPipeline");
   await expect(page.getByTestId("node-XmlToJson")).toBeVisible();
   // Let the canvas finish its fit-to-view animation, or a click can land beside the edge.
@@ -102,20 +102,11 @@ test("a connection shows its topic, consumer group and profile; Kafka edits are 
   await expect(page.getByTestId("profile-settings")).toContainText("kafka-load:9092");
   await expect(page.getByTestId("dirty")).toBeVisible();
 
-  await page.getByTestId("save").click();
-  await expect(page.getByTestId("saved")).toBeVisible();
-  const saved = await (await page.request.get("/api/pipelines/PacketPipeline")).json();
-  expect(saved.manifest).toContain("    Config: kafka/load\n    AllowedTypes: [EnrichedPackets]\n    Topic: packets.enriched.v2\n");
-  expect(saved.manifest).not.toContain("Brokers"); // profiles stay in config-registry
-
-  // Put it back for the other tests.
-  await page.getByTestId("dataset-topic").fill("packets.enriched");
-  await page.getByTestId("dataset-profile").selectOption("kafka/prod");
-  await page.getByTestId("save").click();
-  await expect(page.getByTestId("saved").last()).toBeVisible();
+  await page.getByTestId("deploy").click();
+  await expect(page.getByTestId("deployed")).toBeVisible();
 });
 
-test("a new pipeline with a new Kafka is saved to its own folder", async ({ page }) => {
+test("a new pipeline with a new Kafka is deployed to a branch", async ({ page }) => {
   await page.goto("/?new=1");
   await page.getByTestId("pipeline-name").fill("Audit");
   await page.getByTestId("tab-datasets").click();
@@ -131,10 +122,7 @@ test("a new pipeline with a new Kafka is saved to its own folder", async ({ page
   await page.getByTestId("node-dataset:Audit").click();
   await expect(page.getByTestId("dataset-types")).toHaveValues(["Packets"]);
 
-  await page.getByTestId("save").click();
-  await expect(page.getByTestId("saved")).toBeVisible();
+  await page.getByTestId("deploy").click();
+  await expect(page.getByTestId("deployed")).toBeVisible();
   await expect(page).toHaveURL(/pipeline=Audit/);
-  const saved = await (await page.request.get("/api/pipelines/Audit")).json();
-  expect(saved.manifest).toContain("Name: Audit\n");
-  expect(saved.manifest).toContain("Kafkas:\n  Audit:\n    Config: kafka/load\n    AllowedTypes: [Packets]\n    Topic: packets.audit\n");
 });

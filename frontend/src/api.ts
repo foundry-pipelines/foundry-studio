@@ -48,7 +48,12 @@ async function call<T>(path: string, init?: RequestInit & { json?: unknown }): P
 
 const pipe = (folder: string) => `api/pipelines/${encodeURIComponent(folder)}`;
 
-type Saved = { path: string; layout: string; folder: string };
+export type DeployResult = {
+  folder: string;
+  branch: string;
+  commit: string;
+  mr: { iid: number; url: string; title: string };
+};
 
 export const api = {
   health: () => call<Health>("api/health"),
@@ -64,11 +69,15 @@ export const api = {
   pipelines: () => call<{ pipelines: PipelineListing[] }>("api/pipelines"),
   datasets: () => call<{ datasets: WorkspaceDataset[] }>("api/datasets"),
   load: (folder: string) => call<LoadedPipeline>(pipe(folder)),
-  /** Save to the pipeline's folder, or (folder null) create a new folder named after it. */
-  save: (folder: string | null, graph: Graph, layout: Layout) =>
-    folder
-      ? call<Saved>(pipe(folder), { method: "PUT", json: { graph, layout } })
-      : call<Saved>("api/pipelines", { method: "POST", json: { graph, layout } }),
+  /** Export: return the rendered manifest YAML for download. */
+  exportManifest: (graph: Graph) =>
+    call<{ manifest: string }>("api/export", { method: "POST", json: { graph } }),
+  /** Deploy: commit to a branch and open an MR. */
+  deploy: (folder: string | null, graph: Graph, layout: Layout) =>
+    call<DeployResult>("api/deploy", {
+      method: "POST",
+      json: { graph: folder ? { ...graph, _folder: folder } : graph, layout },
+    }),
   validate: (graph: Graph, signal?: AbortSignal) =>
     call<ValidationResult>("api/validate", { method: "POST", json: { graph }, signal }),
   checkEdge: (graph: Graph, source: string, target: string) =>

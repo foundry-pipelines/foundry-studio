@@ -30,6 +30,9 @@ class GitLab(Protocol):
     async def get_file(self, project: str, path: str, ref: str) -> bytes | None: ...
     async def list_tags(self, project: str, search: str | None = None) -> list[dict]: ...
     async def list_events(self, project: str) -> list[dict]: ...
+    async def create_branch(self, project: str, branch: str, ref: str) -> dict: ...
+    async def create_commit(self, project: str, branch: str, message: str, actions: list[dict]) -> dict: ...
+    async def create_mr(self, project: str, source: str, target: str, title: str) -> dict: ...
     async def aclose(self) -> None: ...
 
 
@@ -118,4 +121,31 @@ class HttpGitLab:
 
     async def list_events(self, project: str) -> list[dict]:
         r = await self._get(f"/projects/{_pid(project)}/events", {"per_page": 50})
+        return r.json()
+
+    async def create_branch(self, project: str, branch: str, ref: str) -> dict:
+        r = await self._client.post(
+            f"/projects/{_pid(project)}/repository/branches",
+            json={"branch": branch, "ref": ref},
+        )
+        if r.status_code >= 400:
+            raise GitLabError(r.status_code, r.text[:200])
+        return r.json()
+
+    async def create_commit(self, project: str, branch: str, message: str, actions: list[dict]) -> dict:
+        r = await self._client.post(
+            f"/projects/{_pid(project)}/repository/commits",
+            json={"branch": branch, "commit_message": message, "actions": actions},
+        )
+        if r.status_code >= 400:
+            raise GitLabError(r.status_code, r.text[:200])
+        return r.json()
+
+    async def create_mr(self, project: str, source: str, target: str, title: str) -> dict:
+        r = await self._client.post(
+            f"/projects/{_pid(project)}/merge_requests",
+            json={"source_branch": source, "target_branch": target, "title": title},
+        )
+        if r.status_code >= 400:
+            raise GitLabError(r.status_code, r.text[:200])
         return r.json()
