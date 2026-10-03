@@ -22,7 +22,7 @@ frontend:
   script:
     - cd frontend && npm ci && npx tsc -b && npx vitest run
 
-image:
+build-image:
   stage: build
   tags: [saas-linux-small-arm64]
   image: docker:27
